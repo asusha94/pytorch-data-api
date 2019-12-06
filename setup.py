@@ -1,5 +1,5 @@
 import os
-from distutils.core import setup
+from setuptools import setup
 
 version = '0.0.1'
 
@@ -16,6 +16,19 @@ try:
 except IOError:
     INSTALL_REQUIRES = []
 
+
+def test_suite():
+    import sys
+    import unittest
+
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src'))
+
+    test_loader = unittest.TestLoader()
+    test_suite = test_loader.discover('tests', pattern='test_*.py')
+
+    return test_suite
+
+
 setup(
     name='pytorch-data-api',
     version=version,
@@ -23,8 +36,9 @@ setup(
     author_email='isushik94@gmail.com',
     description='Data API',
     long_description=README,
-    package_dir={'torch_data': 'src'},
+    package_dir={'torch_data': 'src/torch_data'},
     packages=['torch_data'],
+    test_suite='setup.test_suite',
     install_requires=INSTALL_REQUIRES,
     keywords=['pytorch', 'torch', 'deep learning', 'data api', 'dataset'],
     classifiers=[
