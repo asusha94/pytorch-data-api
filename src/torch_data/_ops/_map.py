@@ -26,7 +26,7 @@ class _ParallelIterator:
         import multiprocessing
         import time
 
-        N_MAX_LOCALS = 2
+        N_MAX_LOCALS = 1
 
         map_func = dill.loads(map_func)
         put_strategy = dill.loads(put_strategy)
@@ -42,13 +42,12 @@ class _ParallelIterator:
                                 sample = dill.loads(input_queue.get_nowait())
                         finally:
                             input_rlock.release()
+                            time.sleep(0)
 
                     if sample is not None:
                         i, sample = sample
 
                         result = map_func(*sample)
-
-                        result = dill.dumps(result)
 
                         local_queue.append((i, result))
 
@@ -61,15 +60,14 @@ class _ParallelIterator:
                     else:
                         try:
                             if not output_queue.full() and put_strategy(fetched_idx.value, idx):
-                                output_queue.put_nowait(result)
+                                output_queue.put_nowait(dill.dumps(result))
                                 del local_queue[i]
                                 i -= 1
                         finally:
                             output_rlock.release()
+                            time.sleep(0)
 
                     i += 1
-                else:
-                    time.sleep(0)
             except Exception:
                 import traceback
                 print(multiprocessing.current_process().name, 'got an error:\n', traceback.format_exc())
@@ -134,26 +132,39 @@ class _ParallelIterator:
 
     def __next__(self):
         import dill
+        import time
         from concurrent.futures import Future
 
         while not self._stop_fetching:
             try:
                 # fill the input queue untill it's full
                 while not self._input_queue.full():
-                    sample = next(self._source_iter)
-                    self._enumerator += 1
-                    i = self._enumerator
+                    if self._input_rlock.acquire(False):
+                        try:
+                            if not self._input_queue.full():
+                                sample = next(self._source_iter)
+                                self._enumerator += 1
+                                i = self._enumerator
 
-                    if not isinstance(sample, tuple):
-                        sample = (sample,)
+                                if not isinstance(sample, tuple):
+                                    sample = (sample,)
 
-                    self._input_queue.put_nowait(dill.dumps((i, sample)))
+                                self._input_queue.put_nowait(dill.dumps((i, sample)))
+                        finally:
+                            self._input_rlock.release()
+                            time.sleep(0)
 
                 # try to get a result
                 if not self._output_queue.empty():
-                    result = self._output_queue.get_nowait()
-                    self._fetched_idx.value += 1
-                    return dill.loads(result)
+                    if self._output_rlock.acquire(False):
+                        try:
+                            if not self._output_queue.empty():
+                                result = self._output_queue.get_nowait()
+                                self._fetched_idx.value += 1
+                                return dill.loads(result)
+                        finally:
+                            self._output_rlock.release()
+                            time.sleep(0)
 
             except StopIteration:
                 self._stop_fetching = True
@@ -162,9 +173,15 @@ class _ParallelIterator:
 
         while self._fetched_idx.value < self._enumerator:
             if not self._output_queue.empty():
-                result = self._output_queue.get_nowait()
-                self._fetched_idx.value += 1
-                return dill.loads(result)
+                if self._output_rlock.acquire(False):
+                    try:
+                        if not self._output_queue.empty():
+                            result = self._output_queue.get_nowait()
+                            self._fetched_idx.value += 1
+                            return dill.loads(result)
+                    finally:
+                        self._output_rlock.release()
+                        time.sleep(0)
         else:
             raise StopIteration()
 
