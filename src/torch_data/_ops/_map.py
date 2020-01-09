@@ -1,6 +1,8 @@
 
 
 class _SerialIterator:
+    _none = object()
+
     def __init__(self, source, map_func):
         self._source_iter = iter(source)
         self._map_func = map_func
@@ -9,14 +11,20 @@ class _SerialIterator:
         return self
 
     def __next__(self):
-        sample = next(self._source_iter)
-        if not isinstance(sample, tuple):
-            sample = (sample,)
+        sample = next(self._source_iter, self._none)
 
-        return self._map_func(*sample)
+        if sample is self._none:
+            raise StopIteration()
+        else:
+            if not isinstance(sample, tuple):
+                sample = (sample,)
+
+            return self._map_func(*sample)
 
 
 class _ParallelIterator:
+    _none = object()
+
     @staticmethod
     def _parallel_process(map_func, put_strategy,
                           input_queue, input_rlock,
@@ -136,38 +144,38 @@ class _ParallelIterator:
         from concurrent.futures import Future
 
         while not self._stop_fetching:
-            try:
-                # fill the input queue untill it's full
-                while not self._input_queue.full():
-                    if self._input_rlock.acquire(False):
-                        try:
-                            if not self._input_queue.full():
-                                sample = next(self._source_iter)
-                                self._enumerator += 1
-                                i = self._enumerator
+            # try to get a result
+            if not self._output_queue.empty():
+                if self._output_rlock.acquire(False):
+                    try:
+                        if not self._output_queue.empty():
+                            result = self._output_queue.get_nowait()
+                            self._fetched_idx.value += 1
+                            return dill.loads(result)
+                    finally:
+                        self._output_rlock.release()
+                        time.sleep(0)
 
-                                if not isinstance(sample, tuple):
-                                    sample = (sample,)
+            # fill the input queue untill it's full
+            while not self._input_queue.full():
+                if self._input_rlock.acquire(False):
+                    try:
+                        if not self._input_queue.full():
+                            sample = next(self._source_iter, self._none)
+                            if sample is self._none:
+                                self._stop_fetching = True
+                                break
 
-                                self._input_queue.put_nowait(dill.dumps((i, sample)))
-                        finally:
-                            self._input_rlock.release()
-                            time.sleep(0)
+                            self._enumerator += 1
+                            i = self._enumerator
 
-                # try to get a result
-                if not self._output_queue.empty():
-                    if self._output_rlock.acquire(False):
-                        try:
-                            if not self._output_queue.empty():
-                                result = self._output_queue.get_nowait()
-                                self._fetched_idx.value += 1
-                                return dill.loads(result)
-                        finally:
-                            self._output_rlock.release()
-                            time.sleep(0)
+                            if not isinstance(sample, tuple):
+                                sample = (sample,)
 
-            except StopIteration:
-                self._stop_fetching = True
+                            self._input_queue.put_nowait(dill.dumps((i, sample)))
+                    finally:
+                        self._input_rlock.release()
+                        time.sleep(0)
 
         assert self._stop_fetching, ''
 

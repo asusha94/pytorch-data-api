@@ -5,6 +5,8 @@ from ._ops import MapDataOperation
 
 
 class DatasetIterator:
+    _none = object()
+
     def __init__(self, dataset):
         self._dataset = dataset
         self._dataset_iter = iter(self._dataset)
@@ -13,7 +15,11 @@ class DatasetIterator:
         return self
 
     def __next__(self):
-        return next(self._dataset_iter)
+        item = next(self._dataset_iter, self._none)
+        if item is self._none:
+            raise StopIteration()
+        else:
+            return item
 
 
 class Dataset:
@@ -26,16 +32,14 @@ class Dataset:
         return Dataset(_impl=source)
 
     @staticmethod
-    def from_tensor_slices(tensors):
-        assert tensors is not None, 'tensors: Must be set'
-
-        return Dataset(_impl=TensorSlicesDataSource(tensors=tensors))
+    def from_tensor_slices(*tensor_args, tensors=None):
+        source = TensorSlicesDataSource(*tensor_args, tensors=tensors)
+        return Dataset(_impl=source)
 
     @staticmethod
-    def from_tensors(tensors):
-        assert tensors is not None, 'tensors: Must be set'
-
-        return Dataset(_impl=TensorsDataSource(tensors=tensors))
+    def from_tensors(*tensor_args, tensors=None):
+        source = TensorsDataSource(*tensor_args, tensors=tensors)
+        return Dataset(_impl=source)
 
     def __init__(self, *, _impl=None):
         assert _impl is not None, ''
@@ -50,6 +54,9 @@ class Dataset:
         return DatasetIterator(self._impl)
 
     def concatenate(self, dataset):
+        pass
+
+    def interleave(self, dataset):
         pass
 
     def filter(self, predicate):
