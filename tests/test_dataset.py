@@ -63,27 +63,151 @@ class TestDataset(unittest.TestCase):
 
         self.assertEqual(i, 999)
 
-    def test_parallel_map_ordered(self):
-        ds = torch_data.Dataset.from_generator(range, args=(1000,))
-        ds = ds.map(lambda x: x**2, num_parallel_calls=4)
+    # def test_parallel_map_ordered(self):
+    #     ds = torch_data.Dataset.from_generator(range, args=(1000,))
+    #     ds = ds.map(lambda x: x**2, num_parallel_calls=4)
+
+    #     for i, r in enumerate(ds):
+    #         self.assertEqual(i**2, r)
+
+    #     self.assertEqual(i, 999)
+
+    # def test_parallel_map_unordered(self):
+    #     ds = torch_data.Dataset.from_generator(range, args=(1000,))
+    #     ds = ds.map(lambda x: x**2, num_parallel_calls=4, ordered=False)
+
+    #     sum_1 = 0
+    #     sum_2 = 0
+    #     for i, r in enumerate(ds):
+    #         sum_1 += i**2
+    #         sum_2 += r
+
+    #     self.assertEqual(i, 999)
+    #     self.assertEqual(sum_1, sum_2)
+
+    def test_batch(self):
+        tensor1 = list(range(100))
+        tensor2 = [str(i) + 'i' for i in range(100)]
+
+        # batch_size=1
+        ds = torch_data.Dataset.from_tensor_slices(tensor1, tensor2)
+        ds = ds.batch(1)
 
         for i, r in enumerate(ds):
-            self.assertEqual(i**2, r)
+            self.assertTrue(isinstance(r[0], list))
+            self.assertEqual(len(r[0]), 1)
 
-        self.assertEqual(i, 999)
+            self.assertTrue(isinstance(r[1], list))
+            self.assertEqual(len(r[1]), 1)
 
-    def test_parallel_map_unordered(self):
-        ds = torch_data.Dataset.from_generator(range, args=(1000,))
-        ds = ds.map(lambda x: x**2, num_parallel_calls=4, ordered=False)
+            self.assertEqual(tensor1[i], r[0][0])
+            self.assertEqual(tensor2[i], r[1][0])
 
-        sum_1 = 0
-        sum_2 = 0
+        self.assertEqual(i, 99)
+
+        # batch_size=2
+        ds = torch_data.Dataset.from_tensor_slices(tensor1, tensor2)
+        ds = ds.batch(2)
+
         for i, r in enumerate(ds):
-            sum_1 += i**2
-            sum_2 += r
+            self.assertTrue(isinstance(r[0], list))
+            self.assertEqual(len(r[0]), 2)
 
-        self.assertEqual(i, 999)
-        self.assertEqual(sum_1, sum_2)
+            self.assertTrue(isinstance(r[1], list))
+            self.assertEqual(len(r[1]), 2)
+
+            self.assertEqual(tensor1[i * 2], r[0][0])
+            self.assertEqual(tensor1[i * 2 + 1], r[0][1])
+
+            self.assertEqual(tensor2[i * 2], r[1][0])
+            self.assertEqual(tensor2[i * 2 + 1], r[1][1])
+
+        self.assertEqual(i, 49)
+
+        # batch_size=3
+        ds = torch_data.Dataset.from_tensor_slices(tensor1, tensor2)
+        ds = ds.batch(3)
+
+        for i, r in enumerate(ds):
+            self.assertTrue(isinstance(r[0], list))
+            self.assertEqual(len(r[0]), 3)
+
+            self.assertTrue(isinstance(r[1], list))
+            self.assertEqual(len(r[1]), 3)
+
+            self.assertEqual(tensor1[i * 3], r[0][0])
+            self.assertEqual(tensor1[i * 3 + 1], r[0][1])
+            self.assertEqual(tensor1[i * 3 + 2], r[0][2])
+
+            self.assertEqual(tensor2[i * 3], r[1][0])
+            self.assertEqual(tensor2[i * 3 + 1], r[1][1])
+            self.assertEqual(tensor2[i * 3 + 2], r[1][2])
+
+        self.assertEqual(i, 32)
+
+        # batch_size=3
+        ds = torch_data.Dataset.from_tensor_slices(tensor1, tensor2)
+        ds = ds.batch(3, drop_last=False)
+
+        for i, r in enumerate(ds):
+            if i == 33:
+                self.assertTrue(isinstance(r[0], list))
+                self.assertEqual(len(r[0]), 3)
+
+                self.assertTrue(isinstance(r[1], list))
+                self.assertEqual(len(r[1]), 3)
+
+                self.assertEqual(tensor1[i * 3], r[0][0])
+                self.assertEqual(None, r[0][1])
+                self.assertEqual(None, r[0][2])
+
+                self.assertEqual(tensor2[i * 3], r[1][0])
+                self.assertEqual(None, r[1][1])
+                self.assertEqual(None, r[1][2])
+            else:
+                self.assertTrue(isinstance(r[0], list))
+                self.assertEqual(len(r[0]), 3)
+
+                self.assertTrue(isinstance(r[1], list))
+                self.assertEqual(len(r[1]), 3)
+
+                self.assertEqual(tensor1[i * 3], r[0][0])
+                self.assertEqual(tensor1[i * 3 + 1], r[0][1])
+                self.assertEqual(tensor1[i * 3 + 2], r[0][2])
+
+                self.assertEqual(tensor2[i * 3], r[1][0])
+                self.assertEqual(tensor2[i * 3 + 1], r[1][1])
+                self.assertEqual(tensor2[i * 3 + 2], r[1][2])
+
+        self.assertEqual(i, 33)
+
+        # numpy tensors
+        try:
+            import numpy as np
+            tensor1 = np.array(tensor1)
+            tensor2 = np.arange(len(tensor2) * 2).reshape(-1, 2)
+
+            ds = torch_data.Dataset.from_tensor_slices(tensor1, tensor2)
+            ds = ds.batch(3, drop_last=True)
+
+            for i, r in enumerate(ds):
+                self.assertTrue(isinstance(r[0], np.ndarray))
+                self.assertEqual(np.shape(r[0]), (3,))
+
+                self.assertTrue(isinstance(r[1], np.ndarray))
+                self.assertEqual(np.shape(r[1]), (3, 2))
+
+                self.assertEqual(tensor1[i * 3], r[0][0])
+                self.assertEqual(tensor1[i * 3 + 1], r[0][1])
+                self.assertEqual(tensor1[i * 3 + 2], r[0][2])
+
+                self.assertTrue(np.all(tensor2[i * 3] == r[1][0]))
+                self.assertTrue(np.all(tensor2[i * 3 + 1] == r[1][1]))
+                self.assertTrue(np.all(tensor2[i * 3 + 2] == r[1][2]))
+
+            self.assertEqual(i, 32)
+        except (ImportError, ModuleNotFoundError):
+            pass
 
 
 if __name__ == '__main__':

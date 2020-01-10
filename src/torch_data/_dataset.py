@@ -1,7 +1,7 @@
 
 from ._sources import GeneratorDataSource, TensorSlicesDataSource, TensorsDataSource
 
-from ._ops import MapDataOperation
+from ._ops import BatchDataOperation, MapDataOperation, ShuffleDataOperation
 
 
 class DatasetIterator:
@@ -74,10 +74,18 @@ class Dataset:
         return Dataset(_impl=op)
 
     def shuffle(self, buffer_size, seed=None):
-        pass
+        assert isinstance(buffer_size, int), 'buffer_size: must be an integer'
+        assert buffer_size > 1, 'buffer_size: must be greater than 1'
 
-    def batch(self, batch_size):
-        pass
+        op = ShuffleDataOperation(source=self._impl, buffer_size=buffer_size, seed=seed)
+        return Dataset(_impl=op)
+
+    def batch(self, batch_size, *, drop_last=True):
+        assert isinstance(batch_size, int), 'batch_size: must be an integer'
+        assert isinstance(drop_last, int), 'drop_last: must be a boolean'
+
+        op = BatchDataOperation(source=self._impl, batch_size=batch_size, drop_last=drop_last)
+        return Dataset(_impl=op)
 
     def unbatch(self):
         pass

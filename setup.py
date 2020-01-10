@@ -17,6 +17,7 @@ except IOError:
     INSTALL_REQUIRES = []
 
 
+# Doesn't work with numpy
 def test_suite():
     import sys
     import unittest

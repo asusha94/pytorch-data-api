@@ -13,7 +13,7 @@ class TensorSlicesIterator:
 
     def __next__(self):
         sample = tuple(next(t, self._none) for t in self._tensors_iters)
-        if self._none in sample:
+        if any(map(lambda s: s is self._none, sample)):
             raise StopIteration()
         else:
             return sample
