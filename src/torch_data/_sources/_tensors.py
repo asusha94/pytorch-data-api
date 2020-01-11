@@ -1,18 +1,19 @@
 
-class TensorsIterator:
+class _TensorsIterator:
     def __init__(self, tensors):
         self._tensors = tensors
-        self._i = -1
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        self._i += 1
-        if self._i > 0:
+        if self._tensors is None:
             raise StopIteration()
         else:
-            return self._tensors
+            try:
+                return self._tensors
+            finally:
+                self._tensors = None
 
 
 class TensorsDataSource:
@@ -28,4 +29,4 @@ class TensorsDataSource:
         self._tensors = tensors
 
     def __iter__(self):
-        return TensorsIterator(self._tensors)
+        return _TensorsIterator(self._tensors)

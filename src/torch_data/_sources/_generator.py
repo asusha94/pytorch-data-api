@@ -1,8 +1,8 @@
 
 
-class GeneratorIterator:
-    def __init__(self, iterator_func):
-        self._iter = iterator_func()
+class _GeneratorIterator:
+    def __init__(self, iterator):
+        self._iter = iterator
 
     def __iter__(self):
         return self
@@ -16,7 +16,7 @@ class GeneratorDataSource:
         if args is None:
             args = tuple()
 
-        self._get_iterator = lambda: iter(generator(*args))
+        self.__get_iterator = lambda: _GeneratorIterator(iter(generator(*args)))
 
     def __iter__(self):
-        return GeneratorIterator(self._get_iterator)
+        return self.__get_iterator()

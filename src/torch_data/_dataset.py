@@ -1,15 +1,22 @@
 
 from ._sources import GeneratorDataSource, TensorSlicesDataSource, TensorsDataSource
+from ._sources import ConcatenateDataSource, InterleaveDataSource
 
 from ._ops import BatchDataOperation, MapDataOperation, ShuffleDataOperation
 
 
-class DatasetIterator:
+class _EmptyDatasetIterator:
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        raise StopIteration()
+
+class _DatasetIterator:
     _none = object()
 
-    def __init__(self, dataset):
-        self._dataset = dataset
-        self._dataset_iter = iter(self._dataset)
+    def __init__(self, dataset_iter):
+        self._dataset_iter = dataset_iter
 
     def __iter__(self):
         return self
@@ -41,23 +48,24 @@ class Dataset:
         source = TensorsDataSource(*tensor_args, tensors=tensors)
         return Dataset(_impl=source)
 
-    def __init__(self, *, _impl=None):
-        assert _impl is not None, ''
+    @staticmethod
+    def concatenate(*datasets):
+        assert len(datasets) > 1, 'datasets: two or more datasets can be concatenated'
+        assert all([isinstance(d, Dataset) for d in datasets]), \
+            'datasets: all arguments must be an instance of Dataset class'
 
-        self.__impl = _impl
+        source = ConcatenateDataSource(*datasets)
+        return Dataset(_impl=source)
 
-    @property
-    def _impl(self):
-        return self.__impl
+    @staticmethod
+    def interleave(*datasets):
+        # TODO: random interleaving
+        assert len(datasets) > 1, 'datasets: two or more datasets can be concatenated'
+        assert all([isinstance(d, Dataset) for d in datasets]), \
+            'datasets: all arguments must be an instance of Dataset class'
 
-    def __iter__(self):
-        return DatasetIterator(self._impl)
-
-    def concatenate(self, dataset):
-        pass
-
-    def interleave(self, dataset):
-        pass
+        source = InterleaveDataSource(*datasets)
+        return Dataset(_impl=source)
 
     def filter(self, predicate):
         pass
@@ -92,3 +100,24 @@ class Dataset:
 
     def window(self, size, shift=None, stride=1, drop_remainder=False):
         pass
+
+    def repeat(self, times=None):
+        pass
+
+    #
+    #
+    #
+
+    def __init__(self, *, _impl=None):
+        self.__impl = _impl
+        if self.__impl is None:
+            self.__get_iterator = lambda: _EmptyDatasetIterator()
+        else:
+            self.__get_iterator = lambda: _DatasetIterator(iter(self._impl))
+
+    @property
+    def _impl(self):
+        return self.__impl
+
+    def __iter__(self):
+        return self.__get_iterator()

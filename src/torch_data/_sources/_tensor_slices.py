@@ -1,18 +1,34 @@
 from collections.abc import Iterable
 
 
-class TensorSlicesIterator:
+class _SingleTensorSlicesIterator:
     _none = object()
 
-    def __init__(self, tensors):
-        self._tensors = tensors
-        self._tensors_iters = [iter(t) for t in self._tensors]
+    def __init__(self, tensor_iter):
+        self._tensor_iter = tensor_iter
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        sample = tuple(next(t, self._none) for t in self._tensors_iters)
+        sample = next(self._tensor_iter, self._none)
+        if sample is self._none:
+            raise StopIteration()
+        else:
+            return sample
+
+
+class _MultiTensorSlicesIterator:
+    _none = object()
+
+    def __init__(self, tensor_iters):
+        self._tensor_iters = tensor_iters
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        sample = tuple(next(t, self._none) for t in self._tensor_iters)
         if any(map(lambda s: s is self._none, sample)):
             raise StopIteration()
         else:
@@ -34,5 +50,10 @@ class TensorSlicesDataSource:
 
         self._tensors = tensors
 
+        if len(self._tensors) == 1:
+            self.__get_iterator = lambda: _SingleTensorSlicesIterator(iter(self._tensors[0]))
+        else:
+            self.__get_iterator = lambda: _MultiTensorSlicesIterator([iter(t) for t in self._tensors])
+
     def __iter__(self):
-        return TensorSlicesIterator(self._tensors)
+        return self.__get_iterator()

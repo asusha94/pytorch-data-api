@@ -54,36 +54,78 @@ class TestDataset(unittest.TestCase):
 
         self.assertRaises(StopIteration, next, ds_iter)
 
+    def test_concatenate(self):
+        self.assertRaises(AssertionError, torch_data.Dataset.concatenate)
+        self.assertRaises(AssertionError, torch_data.Dataset.concatenate, torch_data.Dataset())
+        self.assertRaises(AssertionError, torch_data.Dataset.concatenate, [1, 2], torch_data.Dataset())
+        self.assertRaises(AssertionError, torch_data.Dataset.concatenate, torch_data.Dataset(), [1, 2], torch_data.Dataset())
+
+        ds = torch_data.Dataset.concatenate(torch_data.Dataset(), torch_data.Dataset(), torch_data.Dataset())
+        self.assertRaises(StopIteration, next, iter(ds))
+
+        ds = torch_data.Dataset.concatenate(
+            torch_data.Dataset.from_tensor_slices([1, 2, 3, 4]),
+            torch_data.Dataset.from_tensor_slices(['1', '2', '3'])
+        )
+
+        out = []
+        for i, r in enumerate(ds):
+            out.append(r)
+        
+        self.assertEqual(i, 6)
+        self.assertEqual(tuple(out), (1, 2, 3, 4, '1', '2', '3'))
+
+    def test_interleave(self):
+        self.assertRaises(AssertionError, torch_data.Dataset.interleave)
+        self.assertRaises(AssertionError, torch_data.Dataset.interleave, torch_data.Dataset())
+        self.assertRaises(AssertionError, torch_data.Dataset.interleave, [1, 2], torch_data.Dataset())
+        self.assertRaises(AssertionError, torch_data.Dataset.interleave, torch_data.Dataset(), [1, 2], torch_data.Dataset())
+
+        ds = torch_data.Dataset.interleave(torch_data.Dataset(), torch_data.Dataset(), torch_data.Dataset())
+        self.assertRaises(StopIteration, next, iter(ds))
+
+        ds = torch_data.Dataset.interleave(
+            torch_data.Dataset.from_tensor_slices([1, 2, 3, 4]),
+            torch_data.Dataset.from_tensor_slices(['1', '2', '3'])
+        )
+
+        out = []
+        for i, r in enumerate(ds):
+            out.append(r)
+        
+        self.assertEqual(i, 6)
+        self.assertEqual(tuple(out), (1, '1', 2, '2', 3, '3', 4))
+
     def test_serial_map(self):
-        ds = torch_data.Dataset.from_generator(range, args=(1000,))
+        ds = torch_data.Dataset.from_generator(range, args=(100,))
         ds = ds.map(lambda x: x**2)
 
         for i, r in enumerate(ds):
             self.assertEqual(i**2, r)
 
-        self.assertEqual(i, 999)
+        self.assertEqual(i, 99)
 
-    # def test_parallel_map_ordered(self):
-    #     ds = torch_data.Dataset.from_generator(range, args=(1000,))
-    #     ds = ds.map(lambda x: x**2, num_parallel_calls=4)
+    def test_parallel_map_ordered(self):
+        ds = torch_data.Dataset.from_generator(range, args=(100,))
+        ds = ds.map(lambda x: x**2, num_parallel_calls=3)
 
-    #     for i, r in enumerate(ds):
-    #         self.assertEqual(i**2, r)
+        for i, r in enumerate(ds):
+            self.assertEqual(i**2, r)
 
-    #     self.assertEqual(i, 999)
+        self.assertEqual(i, 99)
 
-    # def test_parallel_map_unordered(self):
-    #     ds = torch_data.Dataset.from_generator(range, args=(1000,))
-    #     ds = ds.map(lambda x: x**2, num_parallel_calls=4, ordered=False)
+    def test_parallel_map_unordered(self):
+        ds = torch_data.Dataset.from_generator(range, args=(100,))
+        ds = ds.map(lambda x: x**2, num_parallel_calls=3, ordered=False)
 
-    #     sum_1 = 0
-    #     sum_2 = 0
-    #     for i, r in enumerate(ds):
-    #         sum_1 += i**2
-    #         sum_2 += r
+        sum_1 = 0
+        sum_2 = 0
+        for i, r in enumerate(ds):
+            sum_1 += i**2
+            sum_2 += r
 
-    #     self.assertEqual(i, 999)
-    #     self.assertEqual(sum_1, sum_2)
+        self.assertEqual(i, 99)
+        self.assertEqual(sum_1, sum_2)
 
     def test_shuffle(self):
         tensor1 = list(range(100))
