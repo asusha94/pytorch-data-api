@@ -25,10 +25,14 @@ try:
     class _NumpyStrategy:
         @staticmethod
         def is_supported(item_type):
-            return item_type == np.ndarray or item_type == float or item_type == int
+            return item_type.__module__ == np.__name__ or item_type in [float, int]
 
         def __init__(self, item, batch_size):
-            self._dtype = np.dtype(item)
+            if isinstance(item, np.ndarray):
+                self._dtype = item.dtype
+            else:
+                self._dtype = np.dtype(type(item))
+                
             self._shape = [batch_size] + list(np.shape(item))
 
         def make_batch(self):
@@ -37,7 +41,7 @@ try:
         def batch_insert(self, batch, idx, item):
             batch[idx, ...] = item
 
-    _STRATEGIES.append(_NumpyStrategy)
+    _STRATEGIES.insert(0, _NumpyStrategy)
 except (ImportError, ModuleNotFoundError):
     pass
 
@@ -60,7 +64,7 @@ try:
         def batch_insert(self, batch, idx, item):
             batch[idx, ...] = item
 
-    _STRATEGIES.append(_TorchStrategy)
+    _STRATEGIES.insert(0, _TorchStrategy)
 except (ImportError, ModuleNotFoundError):
     pass
 
@@ -118,8 +122,7 @@ class _BatchIterator:
                         sample = (sample,)
 
                     if self._batch_helper is None:
-                        types = [type(s) for s in sample]
-                        self._batch_helper = _BatchHelper(self._batch_size, types)
+                        self._batch_helper = _BatchHelper(self._batch_size, sample)
                         self._squeeze = not is_tuple
 
                     if self._batch is None:
