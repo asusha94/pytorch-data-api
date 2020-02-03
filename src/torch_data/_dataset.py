@@ -2,7 +2,7 @@
 from ._sources import GeneratorDataSource, TensorSlicesDataSource, TensorsDataSource
 from ._sources import ConcatenateDataSource, InterleaveDataSource
 
-from ._ops import BatchDataOperation, MapDataOperation, ShuffleDataOperation
+from ._ops import BatchDataOperation, MapDataOperation, ShuffleDataOperation, UnBatchDataOperation
 
 
 class _EmptyDatasetIterator:
@@ -11,6 +11,7 @@ class _EmptyDatasetIterator:
 
     def __next__(self):
         raise StopIteration()
+
 
 class _DatasetIterator:
     _none = object()
@@ -96,7 +97,8 @@ class Dataset:
         return Dataset(_impl=op)
 
     def unbatch(self):
-        pass
+        op = UnBatchDataOperation(source=self._impl)
+        return Dataset(_impl=op)
 
     def window(self, size, shift=None, stride=1, drop_remainder=False):
         pass
