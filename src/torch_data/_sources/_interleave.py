@@ -2,7 +2,7 @@
 
 class _InterleaveIterator:
     _none = object()
-    
+
     def __init__(self, datasets):
         self._datasets = list(datasets)
         self._idx = 0
@@ -19,7 +19,7 @@ class _InterleaveIterator:
                     self._idx -= 1
                 else:
                     return sample
-            finally: # cyclic
+            finally:  # cyclic
                 self._idx += 1
                 if self._idx >= len(self._datasets):
                     self._idx = 0

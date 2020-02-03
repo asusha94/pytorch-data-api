@@ -3,9 +3,11 @@
 class _SerialIterator:
     _none = object()
 
-    def __init__(self, source, map_func):
+    def __init__(self, source, map_func, *, ignore_errors=False):
         self._source_iter = iter(source)
         self._map_func = map_func
+
+        self._ignore_errors = ignore_errors
 
     def __iter__(self):
         return self
@@ -19,7 +21,16 @@ class _SerialIterator:
             if not isinstance(sample, tuple):
                 sample = (sample,)
 
-            return self._map_func(*sample)
+            try:
+                return self._map_func(*sample)
+            except Exception:
+                if not self._ignore_errors:
+                    raise
+                else:
+                    import traceback
+                    traceback.print_exc()
+
+                    return None
 
 
 class _ParallelIterator:
@@ -29,7 +40,8 @@ class _ParallelIterator:
     def _parallel_process(map_func, put_strategy,
                           input_queue, input_rlock,
                           output_queue, output_rlock,
-                          fetched_idx, cancel_token):
+                          fetched_idx, cancel_token,
+                          ignore_errors=False):
         import dill
         import multiprocessing
         import time
@@ -80,7 +92,10 @@ class _ParallelIterator:
                 import traceback
                 print(multiprocessing.current_process().name, 'got an error:\n', traceback.format_exc())
 
-    def __init__(self, source, map_func, put_strategy, n_workers):
+                if not ignore_errors:
+                    cancel_token.set()
+
+    def __init__(self, source, map_func, put_strategy, n_workers, *, ignore_errors=False):
         import dill
         import multiprocessing as mp
 
@@ -90,6 +105,8 @@ class _ParallelIterator:
         self._source_iter = iter(source)
         self._map_func = map_func
         self._put_strategy = put_strategy
+
+        self._ignore_errors = ignore_errors
 
         ctx = mp.get_context('spawn')
 
@@ -113,7 +130,8 @@ class _ParallelIterator:
                               self._input_queue, self._input_rlock,
                               self._output_queue, self._output_rlock,
                               self._fetched_idx,
-                              self._cancel_token))
+                              self._cancel_token,
+                              self._ignore_errors))
             for _ in range(n_workers)
         ]
 

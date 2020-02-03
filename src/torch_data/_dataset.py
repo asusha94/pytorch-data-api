@@ -2,7 +2,8 @@
 from ._sources import GeneratorDataSource, TensorSlicesDataSource, TensorsDataSource
 from ._sources import ConcatenateDataSource, InterleaveDataSource
 
-from ._ops import BatchDataOperation, MapDataOperation, ShuffleDataOperation, UnBatchDataOperation
+from ._ops import (BatchDataOperation, FilterDataOperation, MapDataOperation,
+                   ShuffleDataOperation, UnBatchDataOperation)
 
 
 class _EmptyDatasetIterator:
@@ -50,8 +51,11 @@ class Dataset:
         return Dataset(_impl=source)
 
     @staticmethod
-    def concatenate(*datasets):
-        assert len(datasets) > 1, 'datasets: two or more datasets can be concatenated'
+    def concatenate(*dataset_args, datasets=None):
+        if datasets is None:
+            datasets = dataset_args
+
+        assert len(datasets) > 1, 'datasets: only two or more datasets can be concatenated'
         assert all([isinstance(d, Dataset) for d in datasets]), \
             'datasets: all arguments must be an instance of Dataset class'
 
@@ -59,17 +63,24 @@ class Dataset:
         return Dataset(_impl=source)
 
     @staticmethod
-    def interleave(*datasets):
+    def interleave(*dataset_args, datasets=None):
+        if datasets is None:
+            datasets = dataset_args
+
         # TODO: random interleaving
-        assert len(datasets) > 1, 'datasets: two or more datasets can be concatenated'
+        assert len(datasets) > 1, 'datasets: only two or more datasets can be interlieved'
         assert all([isinstance(d, Dataset) for d in datasets]), \
             'datasets: all arguments must be an instance of Dataset class'
 
         source = InterleaveDataSource(*datasets)
         return Dataset(_impl=source)
 
-    def filter(self, predicate):
-        pass
+    def filter(self, predicate, expand_args=True):
+        assert callable(predicate), 'predicate: Must be callable'
+
+        op = FilterDataOperation(source=self._impl, predicate=predicate, expand_args=expand_args)
+
+        return Dataset(_impl=op)
 
     def map(self, map_func, num_parallel_calls=None, ordered=True):
         assert callable(map_func), 'map_func: Must be callable'

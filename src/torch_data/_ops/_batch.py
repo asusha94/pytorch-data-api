@@ -32,7 +32,7 @@ try:
                 self._dtype = item.dtype
             else:
                 self._dtype = np.dtype(type(item))
-                
+
             self._shape = [batch_size] + list(np.shape(item))
 
         def make_batch(self):

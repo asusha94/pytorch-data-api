@@ -4,8 +4,6 @@ class _UnBatchIterator:
 
     def __init__(self, source_iter):
         self._source_iter = source_iter
-        self._batch_size = batch_size
-        self._drop_last = drop_last
 
         self._batch = None
 
@@ -19,7 +17,7 @@ class _UnBatchIterator:
                 if sample is self._none:
                     raise StopIteration()
                 else:
-                    self._batch = sample
+                    self._batch = iter(sample)
 
             sample = next(self._batch, self._none)
             if sample is self._none:
