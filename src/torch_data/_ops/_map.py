@@ -94,6 +94,8 @@ class _ParallelIterator:
 
                 if not ignore_errors:
                     cancel_token.set()
+            except (KeyboardInterrupt, SystemExit):
+                cancel_token.set()
 
     def __init__(self, source, map_func, put_strategy, n_workers, *, ignore_errors=False):
         import dill
@@ -221,16 +223,18 @@ def _unordered_put_strategy(last_fetched_idx, sample_idx):
 
 
 class MapDataOperation:
-    def __init__(self, *, source, map_func, num_parallel_calls=None, ordered=True):
+    def __init__(self, *, source, map_func, num_parallel_calls=None, ordered=True, ignore_errors=False):
         if num_parallel_calls is None or num_parallel_calls == 0:
-            self._get_iterator = lambda: _SerialIterator(source, map_func)
+            self._get_iterator = lambda: _SerialIterator(source, map_func, ignore_errors=ignore_errors)
         else:
             if ordered:
                 self._get_iterator = lambda: _ParallelIterator(
-                    source, map_func, put_strategy=_ordered_put_strategy, n_workers=num_parallel_calls)
+                    source, map_func, put_strategy=_ordered_put_strategy, n_workers=num_parallel_calls,
+                    ignore_errors=ignore_errors)
             else:
                 self._get_iterator = lambda: _ParallelIterator(
-                    source, map_func, put_strategy=_unordered_put_strategy, n_workers=num_parallel_calls)
+                    source, map_func, put_strategy=_unordered_put_strategy, n_workers=num_parallel_calls,
+                    ignore_errors=ignore_errors)
 
     def __iter__(self):
         return self._get_iterator()

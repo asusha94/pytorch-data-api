@@ -82,14 +82,14 @@ class Dataset:
 
         return Dataset(_impl=op)
 
-    def map(self, map_func, num_parallel_calls=None, ordered=True):
+    def map(self, map_func, num_parallel_calls=None, ordered=True, ignore_errors=False):
         assert callable(map_func), 'map_func: Must be callable'
         assert num_parallel_calls is None or isinstance(num_parallel_calls, int), \
             'num_parallel_calls: Must be None or integer'
 
         op = MapDataOperation(source=self._impl, map_func=map_func,
                               num_parallel_calls=num_parallel_calls,
-                              ordered=ordered)
+                              ordered=ordered, ignore_errors=ignore_errors)
 
         return Dataset(_impl=op)
 
