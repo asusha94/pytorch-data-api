@@ -56,7 +56,6 @@ class TestDataset(unittest.TestCase):
 
     def test_concatenate(self):
         self.assertRaises(AssertionError, torch_data.Dataset.concatenate)
-        self.assertRaises(AssertionError, torch_data.Dataset.concatenate, torch_data.Dataset())
         self.assertRaises(AssertionError, torch_data.Dataset.concatenate, [1, 2], torch_data.Dataset())
         self.assertRaises(AssertionError, torch_data.Dataset.concatenate,
                           torch_data.Dataset(), [1, 2], torch_data.Dataset())
@@ -78,7 +77,6 @@ class TestDataset(unittest.TestCase):
 
     def test_interleave(self):
         self.assertRaises(AssertionError, torch_data.Dataset.interleave)
-        self.assertRaises(AssertionError, torch_data.Dataset.interleave, torch_data.Dataset())
         self.assertRaises(AssertionError, torch_data.Dataset.interleave, [1, 2], torch_data.Dataset())
         self.assertRaises(AssertionError, torch_data.Dataset.interleave,
                           torch_data.Dataset(), [1, 2], torch_data.Dataset())

@@ -55,25 +55,32 @@ class Dataset:
         if datasets is None:
             datasets = dataset_args
 
-        assert len(datasets) > 1, 'datasets: only two or more datasets can be concatenated'
+        assert isinstance(datasets, (list, tuple)) and len(datasets), \
+            'datasets: must be a non-empty instance of a list or tuple'
         assert all([isinstance(d, Dataset) for d in datasets]), \
             'datasets: all arguments must be an instance of Dataset class'
 
-        source = ConcatenateDataSource(*datasets)
-        return Dataset(_impl=source)
+        if len(datasets) == 1:
+            return datasets[0]
+        else:
+            source = ConcatenateDataSource(*datasets)
+            return Dataset(_impl=source)
 
     @staticmethod
     def interleave(*dataset_args, datasets=None):
         if datasets is None:
             datasets = dataset_args
 
-        # TODO: random interleaving
-        assert len(datasets) > 1, 'datasets: only two or more datasets can be interlieved'
+        assert isinstance(datasets, (list, tuple)) and len(datasets), \
+            'datasets: must be a non-empty instance of a list or tuple'
         assert all([isinstance(d, Dataset) for d in datasets]), \
             'datasets: all arguments must be an instance of Dataset class'
 
-        source = InterleaveDataSource(*datasets)
-        return Dataset(_impl=source)
+        if len(datasets) == 1:
+            return datasets[0]
+        else:
+            source = InterleaveDataSource(*datasets)
+            return Dataset(_impl=source)
 
     def filter(self, predicate, expand_args=True):
         assert callable(predicate), 'predicate: Must be callable'
