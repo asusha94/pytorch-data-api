@@ -118,7 +118,7 @@ class Dataset:
         op = UnBatchDataOperation(source=self._impl)
         return Dataset(_impl=op)
 
-    def window(self, size, stride=1, *, drop_last=False):
+    def window(self, size, stride=1, *, drop_last=True):
         assert isinstance(size, int), 'size: must be an integer'
         assert isinstance(stride, int), 'stride: must be an integer'
         assert isinstance(drop_last, bool), 'drop_last: must be a boolean'

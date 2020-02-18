@@ -47,7 +47,7 @@ class _WindowIterator:
 
                     self._window.append(sample)
 
-            if not len(self._window):
+            if not len(self._window) or self._batch_helper is None:
                 raise StopIteration()
             else:
                 batch = self._batch_helper.make_batch()
