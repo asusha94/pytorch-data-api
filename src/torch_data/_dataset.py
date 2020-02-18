@@ -3,7 +3,7 @@ from ._sources import GeneratorDataSource, TensorSlicesDataSource, TensorsDataSo
 from ._sources import ConcatenateDataSource, InterleaveDataSource
 
 from ._ops import (BatchDataOperation, FilterDataOperation, MapDataOperation,
-                   ShuffleDataOperation, UnBatchDataOperation)
+                   ShuffleDataOperation, UnBatchDataOperation, WindowDataOperation)
 
 
 class _EmptyDatasetIterator:
@@ -102,7 +102,7 @@ class Dataset:
 
     def batch(self, batch_size, *, drop_last=True):
         assert isinstance(batch_size, int), 'batch_size: must be an integer'
-        assert isinstance(drop_last, int), 'drop_last: must be a boolean'
+        assert isinstance(drop_last, bool), 'drop_last: must be a boolean'
 
         op = BatchDataOperation(source=self._impl, batch_size=batch_size, drop_last=drop_last)
         return Dataset(_impl=op)
@@ -111,8 +111,13 @@ class Dataset:
         op = UnBatchDataOperation(source=self._impl)
         return Dataset(_impl=op)
 
-    def window(self, size, shift=None, stride=1, drop_remainder=False):
-        pass
+    def window(self, size, stride=1, *, drop_last=False):
+        assert isinstance(size, int), 'size: must be an integer'
+        assert isinstance(stride, int), 'stride: must be an integer'
+        assert isinstance(drop_last, bool), 'drop_last: must be a boolean'
+
+        op = WindowDataOperation(source=self._impl, size=size, stride=stride, drop_last=drop_last)
+        return Dataset(_impl=op)
 
     def repeat(self, times=None):
         pass

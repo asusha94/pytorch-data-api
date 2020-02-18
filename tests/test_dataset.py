@@ -58,7 +58,8 @@ class TestDataset(unittest.TestCase):
         self.assertRaises(AssertionError, torch_data.Dataset.concatenate)
         self.assertRaises(AssertionError, torch_data.Dataset.concatenate, torch_data.Dataset())
         self.assertRaises(AssertionError, torch_data.Dataset.concatenate, [1, 2], torch_data.Dataset())
-        self.assertRaises(AssertionError, torch_data.Dataset.concatenate, torch_data.Dataset(), [1, 2], torch_data.Dataset())
+        self.assertRaises(AssertionError, torch_data.Dataset.concatenate,
+                          torch_data.Dataset(), [1, 2], torch_data.Dataset())
 
         ds = torch_data.Dataset.concatenate(torch_data.Dataset(), torch_data.Dataset(), torch_data.Dataset())
         self.assertRaises(StopIteration, next, iter(ds))
@@ -71,7 +72,7 @@ class TestDataset(unittest.TestCase):
         out = []
         for i, r in enumerate(ds):
             out.append(r)
-        
+
         self.assertEqual(i, 6)
         self.assertEqual(tuple(out), (1, 2, 3, 4, '1', '2', '3'))
 
@@ -79,7 +80,8 @@ class TestDataset(unittest.TestCase):
         self.assertRaises(AssertionError, torch_data.Dataset.interleave)
         self.assertRaises(AssertionError, torch_data.Dataset.interleave, torch_data.Dataset())
         self.assertRaises(AssertionError, torch_data.Dataset.interleave, [1, 2], torch_data.Dataset())
-        self.assertRaises(AssertionError, torch_data.Dataset.interleave, torch_data.Dataset(), [1, 2], torch_data.Dataset())
+        self.assertRaises(AssertionError, torch_data.Dataset.interleave,
+                          torch_data.Dataset(), [1, 2], torch_data.Dataset())
 
         ds = torch_data.Dataset.interleave(torch_data.Dataset(), torch_data.Dataset(), torch_data.Dataset())
         self.assertRaises(StopIteration, next, iter(ds))
@@ -92,7 +94,7 @@ class TestDataset(unittest.TestCase):
         out = []
         for i, r in enumerate(ds):
             out.append(r)
-        
+
         self.assertEqual(i, 6)
         self.assertEqual(tuple(out), (1, '1', 2, '2', 3, '3', 4))
 
@@ -134,7 +136,7 @@ class TestDataset(unittest.TestCase):
         # batch_size=1
         ds = torch_data.Dataset.from_tensor_slices(tensor1, tensor2)
         self.assertRaises(AssertionError, ds.shuffle, 1)
-        
+
         ds = ds.shuffle(5)
 
         out1 = []
@@ -271,6 +273,56 @@ class TestDataset(unittest.TestCase):
             self.assertEqual(i, 32)
         except (ImportError, ModuleNotFoundError):
             pass
+
+    def test_window(self):
+        tensor1 = list(range(100))
+        tensor2 = [str(i) + 'i' for i in range(100)]
+
+        # size=1, stride=1
+        ds = torch_data.Dataset.from_tensor_slices(tensor1, tensor2)
+        ds = ds.window(1)
+
+        for i, r in enumerate(ds):
+            # self.assertTrue(isinstance(r[0], list))
+            self.assertEqual(len(r[0]), 1)
+
+            self.assertTrue(isinstance(r[1], list))
+            self.assertEqual(len(r[1]), 1)
+
+            self.assertEqual(tensor1[i], r[0][0])
+            self.assertEqual(tensor2[i], r[1][0])
+
+        self.assertEqual(i, 99)
+
+        # size=2, stride=1
+        ds = torch_data.Dataset.from_tensor_slices(tensor1, tensor2)
+        ds = ds.window(2)
+
+        for i, r in enumerate(ds):
+            self.assertEqual(len(r[0]), 2)
+
+            self.assertTrue(isinstance(r[1], list))
+            self.assertEqual(len(r[1]), 2)
+
+        # size=2, stride=2
+        ds = torch_data.Dataset.from_tensor_slices(tensor1, tensor2)
+        ds = ds.window(2, stride=2)
+
+        for i, r in enumerate(ds):
+            self.assertEqual(len(r[0]), 2)
+
+            self.assertTrue(isinstance(r[1], list))
+            self.assertEqual(len(r[1]), 2)
+
+        # size=2, stride=3
+        ds = torch_data.Dataset.from_tensor_slices(tensor1, tensor2)
+        ds = ds.window(2, stride=3)
+
+        for i, r in enumerate(ds):
+            self.assertEqual(len(r[0]), 2)
+
+            self.assertTrue(isinstance(r[1], list))
+            self.assertEqual(len(r[1]), 2)
 
 
 if __name__ == '__main__':
