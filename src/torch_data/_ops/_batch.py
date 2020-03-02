@@ -54,7 +54,7 @@ try:
             return item_type == torch.Tensor
 
         def __init__(self, item, batch_size):
-            self._dtype = torch.dtype(item)
+            self._dtype = item.dtype
             self._shape = [batch_size] + list(item.size())
             self._device = item.device
 

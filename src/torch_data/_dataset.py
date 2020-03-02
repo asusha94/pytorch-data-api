@@ -3,7 +3,8 @@ from ._sources import GeneratorDataSource, TensorSlicesDataSource, TensorsDataSo
 from ._sources import ConcatenateDataSource, InterleaveDataSource
 
 from ._ops import (BatchDataOperation, FilterDataOperation, MapDataOperation,
-                   ShuffleDataOperation, UnBatchDataOperation, WindowDataOperation)
+                   ShuffleDataOperation, UnBatchDataOperation, WindowDataOperation,
+                   PrefetchDataOperation)
 
 
 class _EmptyDatasetIterator:
@@ -124,6 +125,12 @@ class Dataset:
         assert isinstance(drop_last, bool), 'drop_last: must be a boolean'
 
         op = WindowDataOperation(source=self._impl, size=size, stride=stride, drop_last=drop_last)
+        return Dataset(_impl=op)
+
+    def prefetch(self, size):
+        assert isinstance(size, int), 'size: must be an integer'
+
+        op = PrefetchDataOperation(source=self._impl, buffer_size=size)
         return Dataset(_impl=op)
 
     def repeat(self, times=None):
