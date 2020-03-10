@@ -1,3 +1,4 @@
+import copy
 from collections.abc import Iterable
 
 
@@ -32,7 +33,7 @@ class _MultiTensorSlicesIterator:
         if any(map(lambda s: s is self._none, sample)):
             raise StopIteration()
         else:
-            return sample
+            return tuple(copy.deepcopy(s) for s in sample)
 
 
 class TensorSlicesDataSource:

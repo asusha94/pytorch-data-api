@@ -1,6 +1,7 @@
 import time
 import random
 
+
 class _ShuffleIterator:
     _none = object()
 
@@ -25,13 +26,14 @@ class _ShuffleIterator:
                 self._source_disposed = True
             else:
                 cur_len = len(self._buffer)
-                in_idx = self._rand.randint(0, cur_len) # including
+                in_idx = self._rand.randint(0, cur_len)  # including
                 self._buffer.insert(in_idx, sample)
-        
+
         if not self._buffer:
             raise StopIteration()
         else:
-            return self._buffer.pop(0)
+            s = self._buffer.pop(0)
+            return s
 
 
 class ShuffleDataOperation:

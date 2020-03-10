@@ -1,3 +1,4 @@
+import copy
 
 _STRATEGIES = []
 
@@ -14,7 +15,7 @@ class _DefaultStrategy:
         return [None] * self._batch_size
 
     def batch_insert(self, batch, idx, item):
-        batch[idx] = item
+        batch[idx] = copy.deepcopy(item)
 
 
 _STRATEGIES.append(_DefaultStrategy)

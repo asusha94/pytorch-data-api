@@ -161,7 +161,6 @@ class _ParallelIterator:
     def __next__(self):
         import dill
         import time
-        from concurrent.futures import Future
 
         while not self._stop_fetching:
             # try to get a result

@@ -1,5 +1,4 @@
 
-
 class _PrefetchIterator:
     _none = object()
 
