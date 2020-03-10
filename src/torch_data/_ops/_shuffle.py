@@ -5,16 +5,13 @@ import random
 class _ShuffleIterator:
     _none = object()
 
-    def __init__(self, source_iter, buffer_size, seed):
+    def __init__(self, source_iter, buffer_size, rand):
         self._source_iter = source_iter
         self._buffer_size = buffer_size
+        self._rand = rand
+
         self._buffer = []
         self._source_disposed = False
-
-        if seed is None:
-            seed = int(time.time() * 1000)
-
-        self._rand = random.Random(seed)
 
     def __iter__(self):
         return self
@@ -40,7 +37,11 @@ class ShuffleDataOperation:
     def __init__(self, *, source, buffer_size, seed=None):
         self._source = source
         self._buffer_size = buffer_size
-        self._seed = seed
+
+        if seed is None:
+            self._rand = random
+        else:
+            self._rand = random.Random(seed)
 
     def __iter__(self):
-        return _ShuffleIterator(iter(self._source), self._buffer_size, self._seed)
+        return _ShuffleIterator(iter(self._source), self._buffer_size, self._rand)
