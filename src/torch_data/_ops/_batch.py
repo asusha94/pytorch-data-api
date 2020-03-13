@@ -15,7 +15,10 @@ class _DefaultStrategy:
         return [None] * self._batch_size
 
     def batch_insert(self, batch, idx, item):
-        batch[idx] = copy.deepcopy(item)
+        if item is None:
+            batch[idx] = None
+        else:
+            batch[idx] = copy.deepcopy(item)
 
 
 _STRATEGIES.append(_DefaultStrategy)
@@ -40,7 +43,10 @@ try:
             return np.empty(self._shape, dtype=self._dtype)
 
         def batch_insert(self, batch, idx, item):
-            batch[idx, ...] = item
+            if item is None:
+                batch[idx, ...] = 0
+            else:
+                batch[idx, ...] = item
 
     _STRATEGIES.insert(0, _NumpyStrategy)
 except (ImportError, ModuleNotFoundError):
@@ -63,7 +69,10 @@ try:
             return torch.empty(*self._shape, dtype=self._dtype, device=self._device)
 
         def batch_insert(self, batch, idx, item):
-            batch[idx, ...] = item
+            if item is None:
+                batch[idx, ...] = 0
+            else:
+                batch[idx, ...] = item
 
     _STRATEGIES.insert(0, _TorchStrategy)
 except (ImportError, ModuleNotFoundError):
@@ -114,9 +123,14 @@ class _BatchIterator:
             while self._batch_counter < self._batch_size:
                 sample = next(self._source_iter, self._none)
                 if sample is self._none:
-                    self._batch_counter = self._batch_size
                     if self._drop_last:
                         self._batch = None
+                    elif self._batch is not None:
+                        sample = tuple([None] * len(self._batch))
+                        for i in range(self._batch_counter, self._batch_size):
+                            self._batch_helper.batch_insert(self._batch, i, sample)
+
+                    self._batch_counter = self._batch_size
                 else:
                     is_tuple = isinstance(sample, tuple)
                     if not is_tuple:
