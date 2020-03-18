@@ -138,6 +138,7 @@ class _ParallelIterator:
         ]
 
         for p in self._pool:
+            p.daemon = True
             p.start()
 
     def __del__(self):
