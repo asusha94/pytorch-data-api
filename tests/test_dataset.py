@@ -353,6 +353,37 @@ class TestDataset(unittest.TestCase):
         except (ImportError, ModuleNotFoundError):
             pass
 
+    def test_window_padded(self):
+        tensor1 = list(range(100))
+
+        # numpy tensors
+        try:
+            import numpy as np
+            tensor1 = np.array(tensor1)
+            tensor2 = np.arange(len(tensor1) * 2).reshape(-1, 2)
+
+            ds = torch_data.Dataset.from_tensor_slices(tensor1, tensor2)
+            ds = ds.window_padded(3, 3, padded_shapes=([1, 2], [2, 1]), drop_last=True)
+
+            for i, r in enumerate(ds):
+                self.assertTrue(isinstance(r[0], np.ndarray))
+                self.assertEqual(np.shape(r[0]), (3, 1, 2))
+
+                self.assertTrue(isinstance(r[1], np.ndarray))
+                self.assertEqual(np.shape(r[1]), (3, 2, 1))
+
+                self.assertEqual(tensor1[i * 3], r[0][0, 0, 0])
+                self.assertEqual(tensor1[i * 3 + 1], r[0][1, 0, 0])
+                self.assertEqual(tensor1[i * 3 + 2], r[0][2, 0, 0])
+
+                self.assertTrue(np.all(tensor2[i * 3] == r[1][0, :, 0]))
+                self.assertTrue(np.all(tensor2[i * 3 + 1] == r[1][1, :, 0]))
+                self.assertTrue(np.all(tensor2[i * 3 + 2] == r[1][2, :, 0]))
+
+            # self.assertEqual(i, 32)
+        except (ImportError, ModuleNotFoundError):
+            pass
+
     def test_collate(self):
         import random
 

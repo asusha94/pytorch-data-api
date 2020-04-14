@@ -7,4 +7,5 @@ from ._map import MapDataOperation
 from ._shuffle import ShuffleDataOperation
 from ._unbatch import UnBatchDataOperation
 from ._window import WindowDataOperation
+from ._window_padded import WindowPaddedDataOperation
 from ._prefetch import PrefetchDataOperation

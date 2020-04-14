@@ -4,7 +4,7 @@ from ._sources import ConcatenateDataSource, InterleaveDataSource
 
 from ._ops import (BatchDataOperation, BatchPaddedDataOperation, CollateDataOperation,
                    FilterDataOperation, MapDataOperation, ShuffleDataOperation,
-                   UnBatchDataOperation, WindowDataOperation,
+                   UnBatchDataOperation, WindowDataOperation, WindowPaddedDataOperation,
                    PrefetchDataOperation)
 
 
@@ -146,6 +146,16 @@ class Dataset:
         assert isinstance(drop_last, bool), 'drop_last: must be a boolean'
 
         op = WindowDataOperation(source=self._impl, size=size, stride=stride, drop_last=drop_last)
+        return Dataset(_impl=op)
+
+    def window_padded(self, size, stride=1, *, padded_shapes=None, padding_values=None, drop_last=True):
+        assert isinstance(size, int), 'size: must be an integer'
+        assert isinstance(stride, int), 'stride: must be an integer'
+        assert isinstance(drop_last, bool), 'drop_last: must be a boolean'
+
+        op = WindowPaddedDataOperation(source=self._impl, size=size, stride=stride,
+                                       padded_shapes=padded_shapes,
+                                       padding_values=padding_values, drop_last=drop_last)
         return Dataset(_impl=op)
 
     def prefetch(self, size):
