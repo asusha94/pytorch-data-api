@@ -69,7 +69,7 @@ class Dataset:
             return Dataset(_impl=source)
 
     @staticmethod
-    def interleave(*dataset_args, datasets=None):
+    def interleave(*dataset_args, datasets=None, drop_tails=False):
         if datasets is None:
             datasets = dataset_args
 
@@ -77,11 +77,12 @@ class Dataset:
             'datasets: must be a non-empty instance of a list or tuple'
         assert all([isinstance(d, Dataset) for d in datasets]), \
             'datasets: all arguments must be an instance of Dataset class'
+        assert isinstance(drop_tails, bool), 'drop_tails: must be a boolean'
 
         if len(datasets) == 1:
             return datasets[0]
         else:
-            source = InterleaveDataSource(*datasets)
+            source = InterleaveDataSource(*datasets, drop_tails=drop_tails)
             return Dataset(_impl=source)
 
     #

@@ -25,6 +25,8 @@ class _DefaultStrategy:
         elif isinstance(item, tuple):
             self._padding_value = (self._padding_value,)
             self._can_be_padded = True
+        else:
+            self._can_be_padded = False
 
         if padded_shape is not None:
             if isinstance(padded_shape, (tuple, list)):
@@ -36,9 +38,9 @@ class _DefaultStrategy:
 
     def make_batch(self, items, idx):
         if not self._can_be_padded:
-            batch = [copy.deepcopy(item) for item in items]
+            batch = [copy.deepcopy(item[idx]) for item in items]
         else:
-            lens = [len(item) for item in items]
+            lens = [len(item[idx]) for item in items]
             max_len = max(lens)
 
             padded_len = self._padded_shape if self._padded_shape is not None else max_len
@@ -125,7 +127,7 @@ try:
                         else:
                             batch[i] = item[idx]
             else:
-                shapes = [np.shape(s[idx]) for s in items]
+                shapes = [np.shape(item[idx]) for item in items]
                 max_shape = [(max(shapes, key=operator.itemgetter(i))[i]
                               if self._padded_shape[i] is None
                               else self._padded_shape[i])
