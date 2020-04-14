@@ -2,8 +2,9 @@
 from ._sources import GeneratorDataSource, TensorSlicesDataSource, TensorsDataSource
 from ._sources import ConcatenateDataSource, InterleaveDataSource
 
-from ._ops import (BatchDataOperation, FilterDataOperation, MapDataOperation,
-                   ShuffleDataOperation, UnBatchDataOperation, WindowDataOperation,
+from ._ops import (BatchDataOperation, BatchPaddedDataOperation, CollateDataOperation,
+                   FilterDataOperation, MapDataOperation, ShuffleDataOperation,
+                   UnBatchDataOperation, WindowDataOperation,
                    PrefetchDataOperation)
 
 
@@ -83,6 +84,33 @@ class Dataset:
             source = InterleaveDataSource(*datasets)
             return Dataset(_impl=source)
 
+    #
+    # operations
+
+    def batch(self, batch_size, *, drop_last=True):
+        assert isinstance(batch_size, int), 'batch_size: must be an integer'
+        assert isinstance(drop_last, bool), 'drop_last: must be a boolean'
+
+        op = BatchDataOperation(source=self._impl, batch_size=batch_size, drop_last=drop_last)
+        return Dataset(_impl=op)
+
+    def batch_padded(self, batch_size, *, padded_shapes=None, padding_values=None, drop_last=True):
+        assert isinstance(batch_size, int), 'batch_size: must be an integer'
+        assert isinstance(drop_last, bool), 'drop_last: must be a boolean'
+
+        op = BatchPaddedDataOperation(source=self._impl, batch_size=batch_size,
+                                      padded_shapes=padded_shapes,
+                                      padding_values=padding_values, drop_last=drop_last)
+        return Dataset(_impl=op)
+
+    def collate(self, collate_func, buffer_size=None):
+        assert callable(collate_func), 'collate_func: Must be callable'
+        assert buffer_size is None or isinstance(buffer_size, int), 'buffer_size: must be an integer'
+        assert buffer_size is None or buffer_size > 2, 'buffer_size: must be greater than 2'
+
+        op = CollateDataOperation(source=self._impl, collate_func=collate_func, buffer_size=buffer_size)
+        return Dataset(_impl=op)
+
     def filter(self, predicate, expand_args=True):
         assert callable(predicate), 'predicate: Must be callable'
 
@@ -108,13 +136,6 @@ class Dataset:
         op = ShuffleDataOperation(source=self._impl, buffer_size=buffer_size, seed=seed)
         return Dataset(_impl=op)
 
-    def batch(self, batch_size, *, drop_last=True):
-        assert isinstance(batch_size, int), 'batch_size: must be an integer'
-        assert isinstance(drop_last, bool), 'drop_last: must be a boolean'
-
-        op = BatchDataOperation(source=self._impl, batch_size=batch_size, drop_last=drop_last)
-        return Dataset(_impl=op)
-
     def unbatch(self):
         op = UnBatchDataOperation(source=self._impl)
         return Dataset(_impl=op)
@@ -133,8 +154,8 @@ class Dataset:
         op = PrefetchDataOperation(source=self._impl, buffer_size=size)
         return Dataset(_impl=op)
 
-    def repeat(self, times=None):
-        pass
+    # def repeat(self, times=None):
+    #     pass
 
     #
     #
