@@ -97,17 +97,22 @@ try:
             else:
                 max_shape = batch.shape[1:]
 
-                inner_slices = (idx,) + tuple(slice(0, s, 1) for s in item.shape)
-                outer_slices = (idx,) + tuple(slice(s, m, 1) for s, m in zip(item.shape, max_shape))
+                outer_slices = (idx,) + tuple((slice(s, m, 1) if s < m else None)
+                                              for s, m in zip(item.shape, max_shape))
                 all_slices = (idx,) + tuple(slice(0, m, 1) for m in max_shape)
 
-                batch[inner_slices] = item
-                for i in range(1, len(outer_slices)):
-                    slices = all_slices[:i] + outer_slices[i:i + 1]
-                    if i < len(outer_slices) - 1:
-                        slices = slices + all_slices[i + 1:]
+                item_slices = tuple(slice(0, min(m_s, i_s), 1)
+                                    for m_s, i_s in zip(max_shape, item.shape))
 
-                    batch[slices] = self._padding_value
+                batch[(idx,) + item_slices] = item[item_slices]
+
+                for i in range(1, len(outer_slices)):
+                    if outer_slices[i] is not None:
+                        slices = all_slices[:i] + outer_slices[i:i + 1]
+                        if i < len(outer_slices) - 1:
+                            slices = slices + all_slices[i + 1:]
+
+                        batch[slices] = self._padding_value
 
         def make_batch(self, items, idx):
             if self._ndim == 0:
@@ -189,17 +194,22 @@ try:
             else:
                 max_shape = batch.shape[1:]
 
-                inner_slices = (idx,) + tuple(slice(0, s, 1) for s in item.shape)
-                outer_slices = (idx,) + tuple(slice(s, m, 1) for s, m in zip(item.shape, max_shape))
+                outer_slices = (idx,) + tuple((slice(s, m, 1) if s < m else None)
+                                              for s, m in zip(item.shape, max_shape))
                 all_slices = (idx,) + tuple(slice(0, m, 1) for m in max_shape)
 
-                batch[inner_slices] = item
-                for i in range(1, len(outer_slices)):
-                    slices = all_slices[:i] + outer_slices[i:i + 1]
-                    if i < len(outer_slices) - 1:
-                        slices = slices + all_slices[i + 1:]
+                item_slices = tuple(slice(0, min(m_s, i_s), 1)
+                                    for m_s, i_s in zip(max_shape, item.shape))
 
-                    batch[slices] = self._padding_value
+                batch[(idx,) + item_slices] = item[item_slices]
+
+                for i in range(1, len(outer_slices)):
+                    if outer_slices[i] is not None:
+                        slices = all_slices[:i] + outer_slices[i:i + 1]
+                        if i < len(outer_slices) - 1:
+                            slices = slices + all_slices[i + 1:]
+
+                        batch[slices] = self._padding_value
 
         def make_batch(self, items, idx):
             if self._ndim == 0:
