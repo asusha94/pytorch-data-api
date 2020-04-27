@@ -42,5 +42,5 @@ class ShuffleDataOperation:
         else:
             self._rand = random.Random(seed)
 
-    def __iter__(self):
-        return _ShuffleIterator(iter(self._source), self._buffer_size, self._rand)
+    def get_iter(self, session_id):
+        return _ShuffleIterator(self._source.get_iter(session_id), self._buffer_size, self._rand)

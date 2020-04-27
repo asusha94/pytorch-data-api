@@ -2,17 +2,18 @@
 class _ConcatenateIterator:
     _none = object()
 
-    def __init__(self, datasets):
-        self._datasets = list(datasets)
+    def __init__(self, session_id, dataset_iters):
+        self._session_id = session_id
+        self._dataset_iters = list(dataset_iters)
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        while self._datasets:
-            sample = next(self._datasets[0], self._none)
+        while self._dataset_iters:
+            sample = next(self._dataset_iters[0], self._none)
             if sample is self._none:
-                del self._datasets[0]
+                del self._dataset_iters[0]
             else:
                 return sample
         else:
@@ -20,8 +21,8 @@ class _ConcatenateIterator:
 
 
 class ConcatenateDataSource:
-    def __init__(self, *datasets):
-        self._datasets = datasets
+    def __init__(self, *, dataset_sources):
+        self._dataset_sources = dataset_sources
 
-    def __iter__(self):
-        return _ConcatenateIterator([iter(d) for d in self._datasets])
+    def get_iter(self, session_id):
+        return _ConcatenateIterator(session_id, [d.get_iter(session_id) for d in self._dataset_sources])

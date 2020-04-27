@@ -4,7 +4,7 @@ class _SerialIterator:
     _none = object()
 
     def __init__(self, source, map_func, *, ignore_errors=False):
-        self._source_iter = iter(source)
+        self._source_iter = source
         self._map_func = map_func
 
         self._ignore_errors = ignore_errors
@@ -33,128 +33,122 @@ class _SerialIterator:
                     return None
 
 
+class _ParallelSession:
+    class Pool:
+        @property
+        def uid(self):
+            return self._uid
+
+        def __init__(self, uid):
+            import multiprocessing as mp
+
+            self._ctx = mp.get_context('spawn')
+
+            self._uid = uid
+            self._counter = 0
+
+            self._pool = None
+
+        def submit(self, task, args=None, kwargs=None):
+            assert self._pool is not None, 'The Pool has been disposed'
+
+            if args is None:
+                args = tuple()
+
+            if kwargs is None:
+                kwargs = dict()
+
+            return self._pool.apply_async(task, args=args, kwds=kwargs)
+
+        def _start(self):
+            if not self._pool:
+                import os
+                self._pool = self._ctx.Pool(os.cpu_count())
+
+        def _stop(self):
+            if self._pool:
+                self._pool.close()
+
+                self._pool = None
+
+        def _increment_ref(self):
+            self._counter += 1
+            if self._counter > 0:
+                self._start()
+
+        def _decrement_ref(self):
+            self._counter -= 1
+            assert self._counter >= 0
+
+            if self._counter == 0:
+                self._stop()
+
+            return self._counter == 0
+
+    _pools = dict()
+
+    @staticmethod
+    def get(uid):
+        pool = _ParallelSession._pools.get(uid)
+        if pool is None:
+            pool = _ParallelSession.Pool(uid)
+            _ParallelSession._pools[uid] = pool
+
+        pool._increment_ref()
+
+        return pool
+
+    @staticmethod
+    def release(pool):
+        if pool._decrement_ref():
+            del _ParallelSession._pools[pool.uid]
+
+
 class _ParallelIterator:
     _none = object()
 
     @staticmethod
-    def _parallel_process(map_func, put_strategy,
-                          input_queue, input_rlock,
-                          output_queue, output_rlock,
-                          fetched_idx, cancel_token,
-                          ignore_errors=False):
+    def _parallel_process(map_func, sample, ignore_errors=False):
         import dill
         import multiprocessing
-        import time
-
-        N_MAX_LOCALS = 1
 
         map_func = dill.loads(map_func)
-        put_strategy = dill.loads(put_strategy)
+        sample = dill.loads(sample)
 
-        local_queue = []
-        while not cancel_token.is_set():
-            try:
-                if len(local_queue) < N_MAX_LOCALS:
-                    sample = None
-                    if input_rlock.acquire(False):
-                        try:
-                            if not input_queue.empty():
-                                sample = dill.loads(input_queue.get_nowait())
-                        finally:
-                            input_rlock.release()
-                            time.sleep(0)
+        try:
+            result = map_func(*sample)
+            return dill.dumps(result)
+        except Exception:
+            import traceback
+            print(multiprocessing.current_process().name, 'got an error:\n', traceback.format_exc())
 
-                    if sample is not None:
-                        i, sample = sample
+            if not ignore_errors:
+                raise
 
-                        result = map_func(*sample)
-
-                        local_queue.append((i, result))
-
-                i = 0
-                while i < len(local_queue):
-                    idx, result = local_queue[i]
-
-                    if not output_rlock.acquire(False):
-                        break
-                    else:
-                        try:
-                            if not output_queue.full() and put_strategy(fetched_idx.value, idx):
-                                output_queue.put_nowait(dill.dumps(result))
-                                del local_queue[i]
-                                i -= 1
-                        finally:
-                            output_rlock.release()
-                            time.sleep(0)
-
-                    i += 1
-            except Exception:
-                import traceback
-                print(multiprocessing.current_process().name, 'got an error:\n', traceback.format_exc())
-
-                if not ignore_errors:
-                    cancel_token.set()
-            except (KeyboardInterrupt, SystemExit):
-                cancel_token.set()
-
-    def __init__(self, source, map_func, put_strategy, n_workers, *, ignore_errors=False):
+    def __init__(self, session_id, source, map_func, n_workers, ordered, *, ignore_errors=False):
         import dill
-        import multiprocessing as mp
+
+        self._pool = _ParallelSession.get(session_id)
 
         self._stop_fetching = False
 
         self._n_workers = n_workers
-        self._source_iter = iter(source)
-        self._map_func = map_func
-        self._put_strategy = put_strategy
+        self._source_iter = source
+
+        self._map_func_dump = dill.dumps(map_func)
 
         self._ignore_errors = ignore_errors
 
-        ctx = mp.get_context('spawn')
+        self._source_disposed = False
 
-        self._qsize = n_workers * 3 // 2
+        self._queue = []
 
-        self._input_queue = ctx.Queue(maxsize=self._qsize)
-        self._input_rlock = ctx.RLock()
-        self._output_queue = ctx.Queue(maxsize=self._qsize)
-        self._output_rlock = ctx.RLock()
-
-        self._enumerator = -1
-        self._fetched_idx = ctx.Value('i', -1)
-
-        self._cancel_token = ctx.Event()
-        self._cancel_token.clear()
-
-        self._pool = [
-            ctx.Process(target=_ParallelIterator._parallel_process,
-                        args=(dill.dumps(self._map_func),
-                              dill.dumps(self._put_strategy),
-                              self._input_queue, self._input_rlock,
-                              self._output_queue, self._output_rlock,
-                              self._fetched_idx,
-                              self._cancel_token,
-                              self._ignore_errors))
-            for _ in range(n_workers)
-        ]
-
-        for p in self._pool:
-            p.daemon = True
-            p.start()
+        self._ordered = ordered
 
     def __del__(self):
-        self._input_queue.cancel_join_thread()
-        self._input_queue.close()
-
-        self._cancel_token.set()
-
-        self._output_queue.cancel_join_thread()
-
-        for p in self._pool:
-            try:
-                p.join(0.1)
-                p.close()
-            except Exception:
-                p.terminate()
+        if self._pool is not None:
+            _ParallelSession.release(self._pool)
+            self._pool = None
 
     def __iter__(self):
         return self
@@ -163,78 +157,56 @@ class _ParallelIterator:
         import dill
         import time
 
-        while not self._stop_fetching:
-            # try to get a result
-            if not self._output_queue.empty():
-                if self._output_rlock.acquire(False):
-                    try:
-                        if not self._output_queue.empty():
-                            result = self._output_queue.get_nowait()
-                            self._fetched_idx.value += 1
-                            return dill.loads(result)
-                    finally:
-                        self._output_rlock.release()
-                        time.sleep(0)
-
-            # fill the input queue untill it's full
-            while not self._input_queue.full():
-                if self._input_rlock.acquire(False):
-                    try:
-                        if not self._input_queue.full():
-                            sample = next(self._source_iter, self._none)
-                            if sample is self._none:
-                                self._stop_fetching = True
-                                break
-
-                            self._enumerator += 1
-                            i = self._enumerator
-
-                            if not isinstance(sample, tuple):
-                                sample = (sample,)
-
-                            self._input_queue.put_nowait(dill.dumps((i, sample)))
-                    finally:
-                        self._input_rlock.release()
-                        time.sleep(0)
-
-        assert self._stop_fetching, ''
-
-        while self._fetched_idx.value < self._enumerator:
-            if not self._output_queue.empty():
-                if self._output_rlock.acquire(False):
-                    try:
-                        if not self._output_queue.empty():
-                            result = self._output_queue.get_nowait()
-                            self._fetched_idx.value += 1
-                            return dill.loads(result)
-                    finally:
-                        self._output_rlock.release()
-                        time.sleep(0)
-        else:
+        if self._pool is None:
             raise StopIteration()
+        else:
+            while not self._source_disposed and len(self._queue) < self._n_workers:
+                sample = next(self._source_iter, self._none)
+                if sample is self._none:
+                    self._source_disposed = True
+                else:
+                    if not isinstance(sample, tuple):
+                        sample = (sample,)
 
+                    result = self._pool.submit(self._parallel_process,
+                                               args=(self._map_func_dump, dill.dumps(sample), self._ignore_errors))
+                    self._queue.append(result)
 
-def _ordered_put_strategy(last_fetched_idx, sample_idx):
-    return sample_idx == last_fetched_idx + 1
+            if not self._queue:
+                _ParallelSession.release(self._pool)
+                self._pool = None
+                raise StopIteration()
+            else:
+                result_idx = None
+                if self._ordered:
+                    while not self._queue[0].ready():
+                        time.sleep(1e-9)
+                    else:
+                        result_idx = 0
+                else:
+                    while result_idx is None:
+                        ready = [i for (i, result) in enumerate(self._queue) if result.ready()]
+                        if ready:
+                            result_idx = ready[0]
+                        else:
+                            time.sleep(1e-9)
 
-
-def _unordered_put_strategy(last_fetched_idx, sample_idx):
-    return True
+                result = self._queue[result_idx].get()
+                del self._queue[result_idx]
+                return dill.loads(result)
 
 
 class MapDataOperation:
     def __init__(self, *, source, map_func, num_parallel_calls=None, ordered=True, ignore_errors=False):
         if num_parallel_calls is None or num_parallel_calls == 0:
-            self._get_iterator = lambda: _SerialIterator(source, map_func, ignore_errors=ignore_errors)
+            self._get_iterator = lambda sid: _SerialIterator(
+                source.get_iter(sid), map_func, ignore_errors=ignore_errors)
         else:
-            if ordered:
-                self._get_iterator = lambda: _ParallelIterator(
-                    source, map_func, put_strategy=_ordered_put_strategy, n_workers=num_parallel_calls,
-                    ignore_errors=ignore_errors)
-            else:
-                self._get_iterator = lambda: _ParallelIterator(
-                    source, map_func, put_strategy=_unordered_put_strategy, n_workers=num_parallel_calls,
-                    ignore_errors=ignore_errors)
+            self._get_iterator = lambda sid: _ParallelIterator(sid,
+                                                               source.get_iter(sid), map_func,
+                                                               n_workers=num_parallel_calls,
+                                                               ordered=ordered,
+                                                               ignore_errors=ignore_errors)
 
-    def __iter__(self):
-        return self._get_iterator()
+    def get_iter(self, session_id):
+        return self._get_iterator(session_id)

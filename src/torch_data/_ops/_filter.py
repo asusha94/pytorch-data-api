@@ -34,5 +34,5 @@ class FilterDataOperation:
         self._predicate = predicate
         self._expand_args = expand_args
 
-    def __iter__(self):
-        return _SerialIterator(iter(self._source), self._predicate, self._expand_args)
+    def get_iter(self, session_id):
+        return _SerialIterator(self._source.get_iter(session_id), self._predicate, self._expand_args)

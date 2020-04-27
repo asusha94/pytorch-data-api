@@ -55,5 +55,5 @@ class UnBatchDataOperation:
     def __init__(self, *, source):
         self._source = source
 
-    def __iter__(self):
-        return _UnBatchIterator(iter(self._source))
+    def get_iter(self, session_id):
+        return _UnBatchIterator(self._source.get_iter(session_id))

@@ -1,11 +1,11 @@
 import copy
-from collections.abc import Iterable
 
 
 class _SingleTensorSlicesIterator:
     _none = object()
 
-    def __init__(self, tensor_iter):
+    def __init__(self, session_id, tensor_iter):
+        self._session_id = session_id
         self._tensor_iter = tensor_iter
 
     def __iter__(self):
@@ -22,7 +22,8 @@ class _SingleTensorSlicesIterator:
 class _MultiTensorSlicesIterator:
     _none = object()
 
-    def __init__(self, tensor_iters):
+    def __init__(self, session_id, tensor_iters):
+        self._session_id = session_id
         self._tensor_iters = tensor_iters
 
     def __iter__(self):
@@ -37,24 +38,13 @@ class _MultiTensorSlicesIterator:
 
 
 class TensorSlicesDataSource:
-    def __init__(self, *tensor_args, tensors=None):
-        assert bool(len(tensor_args)) != (tensors is not None), \
-            'tensors: only one way of initialization is supported'
-
-        if len(tensor_args):
-            tensors = tensor_args
-        else:
-            assert isinstance(tensors, tuple), 'tensors: must be a tuple of tensors'
-
-        states = set([isinstance(t, Iterable) for t in tensors])
-        assert len(states) == 1, 'tensors: all tensors in the tuple must have the same length'
-
+    def __init__(self, *, tensors=None):
         self._tensors = tensors
 
         if len(self._tensors) == 1:
-            self.__get_iterator = lambda: _SingleTensorSlicesIterator(iter(self._tensors[0]))
+            self.__get_iterator = lambda sid: _SingleTensorSlicesIterator(sid, iter(self._tensors[0]))
         else:
-            self.__get_iterator = lambda: _MultiTensorSlicesIterator([iter(t) for t in self._tensors])
+            self.__get_iterator = lambda sid: _MultiTensorSlicesIterator(sid, [iter(t) for t in self._tensors])
 
-    def __iter__(self):
-        return self.__get_iterator()
+    def get_iter(self, session_id):
+        return self.__get_iterator(session_id)

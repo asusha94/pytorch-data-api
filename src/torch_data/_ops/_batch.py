@@ -164,5 +164,5 @@ class BatchDataOperation:
         self._batch_size = batch_size
         self._drop_last = drop_last
 
-    def __iter__(self):
-        return _BatchIterator(iter(self._source), self._batch_size, self._drop_last)
+    def get_iter(self, session_id):
+        return _BatchIterator(self._source.get_iter(session_id), self._batch_size, self._drop_last)

@@ -68,5 +68,5 @@ class WindowDataOperation:
         self._stride = stride
         self._drop_last = drop_last
 
-    def __iter__(self):
-        return _WindowIterator(iter(self._source), self._size, self._stride, self._drop_last)
+    def get_iter(self, session_id):
+        return _WindowIterator(self._source.get_iter(session_id), self._size, self._stride, self._drop_last)

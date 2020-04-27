@@ -30,5 +30,5 @@ class PrefetchDataOperation:
         self._source = source
         self._buffer_size = buffer_size
 
-    def __iter__(self):
-        return _PrefetchIterator(iter(self._source), self._buffer_size)
+    def get_iter(self, session_id):
+        return _PrefetchIterator(self._source.get_iter(session_id), self._buffer_size)

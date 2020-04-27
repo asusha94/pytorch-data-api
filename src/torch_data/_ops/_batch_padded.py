@@ -390,6 +390,7 @@ class BatchPaddedDataOperation:
         self._padding_values = padding_values
         self._drop_last = drop_last
 
-    def __iter__(self):
+    def get_iter(self, session_id):
         return _BatchPaddedIterator(
-            iter(self._source), self._batch_size, self._padded_shapes, self._padding_values, self._drop_last)
+            self._source.get_iter(session_id),
+            self._batch_size, self._padded_shapes, self._padding_values, self._drop_last)

@@ -45,5 +45,5 @@ class CollateDataOperation:
         self._collate_func = collate_func
         self._buffer_size = buffer_size
 
-    def __iter__(self):
-        return _CollateIterator(iter(self._source), self._collate_func, self._buffer_size)
+    def get_iter(self, session_id):
+        return _CollateIterator(self._source.get_iter(session_id), self._collate_func, self._buffer_size)

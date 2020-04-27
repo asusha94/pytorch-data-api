@@ -1,6 +1,7 @@
 
 class _TensorsIterator:
-    def __init__(self, tensors):
+    def __init__(self, session_id, tensors):
+        self._session_id = session_id
         self._tensors = tensors
 
     def __iter__(self):
@@ -17,16 +18,8 @@ class _TensorsIterator:
 
 
 class TensorsDataSource:
-    def __init__(self, *tensor_args, tensors=None):
-        assert bool(len(tensor_args)) != (tensors is not None), \
-            'tensors: only one way of initialization is supported'
-
-        if len(tensor_args):
-            tensors = tensor_args
-        else:
-            assert isinstance(tensors, tuple), 'tensors: must be a tuple of tensors'
-
+    def __init__(self, *, tensors):
         self._tensors = tensors
 
-    def __iter__(self):
-        return _TensorsIterator(self._tensors)
+    def get_iter(self, session_id):
+        return _TensorsIterator(session_id, self._tensors)
