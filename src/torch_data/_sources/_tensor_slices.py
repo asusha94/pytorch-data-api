@@ -12,8 +12,12 @@ class _SingleTensorSlicesIterator:
         return self
 
     def __next__(self):
+        if self._tensor_iter is None:
+            raise StopIteration()
+
         sample = next(self._tensor_iter, self._none)
         if sample is self._none:
+            self._tensor_iter = None
             raise StopIteration()
         else:
             return sample

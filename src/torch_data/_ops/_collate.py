@@ -8,7 +8,6 @@ class _CollateIterator:
         self._collate_func = collate_func
         self._buffer_size = buffer_size
 
-        self._source_disposed = False
         self._collate_iter = None
         self._iter_disposed = False
 
@@ -16,13 +15,13 @@ class _CollateIterator:
         return self
 
     def __next__(self):
-        while True:
+        while self._source_iter is not None:
             if self._collate_iter is None:
                 buffer = []
-                while not self._source_disposed and (self._buffer_size is None or len(buffer) < self._buffer_size):
+                while self._source_iter is not None and (self._buffer_size is None or len(buffer) < self._buffer_size):
                     sample = next(self._source_iter, self._none)
                     if sample is self._none:
-                        self._source_disposed = True
+                        self._source_iter = None
                     else:
                         buffer.append(sample)
 
@@ -37,6 +36,8 @@ class _CollateIterator:
                     self._collate_iter = None
                 else:
                     return sample
+        else:
+            raise StopIteration()
 
 
 class CollateDataOperation:

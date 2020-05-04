@@ -6,16 +6,15 @@ class _PrefetchIterator:
         self._source_iter = source_iter
         self._buffer_size = buffer_size
         self._buffer = []
-        self._source_disposed = False
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        while not self._source_disposed and len(self._buffer) < self._buffer_size:
+        while self._source_iter is not None and len(self._buffer) < self._buffer_size:
             sample = next(self._source_iter, self._none)
             if sample is self._none:
-                self._source_disposed = True
+                self._source_iter = None
             else:
                 self._buffer.append(sample)
 

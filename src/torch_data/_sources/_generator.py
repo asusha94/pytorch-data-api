@@ -1,6 +1,8 @@
 
 
 class _GeneratorIterator:
+    _none = object()
+
     def __init__(self, session_id, iterator):
         self._session_id = session_id
         self._iter = iterator
@@ -9,7 +11,15 @@ class _GeneratorIterator:
         return self
 
     def __next__(self):
-        return next(self._iter)
+        if self._iter is None:
+            raise StopIteration()
+
+        sample = next(self._iter, self._none)
+        if sample is self._none:
+            self._iter = None
+            raise StopIteration()
+        else:
+            return sample
 
 
 class GeneratorDataSource:

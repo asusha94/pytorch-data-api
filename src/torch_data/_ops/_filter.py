@@ -11,11 +11,11 @@ class _SerialIterator:
         return self
 
     def __next__(self):
-        while True:
+        while self._source_iter is not None:
             sample = next(self._source_iter, self._none)
 
             if sample is self._none:
-                raise StopIteration()
+                self._source_iter = None
             else:
                 if not self._expand_args:
                     val = self._predicate(sample)
@@ -26,6 +26,8 @@ class _SerialIterator:
 
                 if val:
                     return sample
+        else:
+            raise StopIteration()
 
 
 class FilterDataOperation:

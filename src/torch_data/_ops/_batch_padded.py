@@ -345,22 +345,22 @@ class _BatchPaddedIterator:
         self._padding_values = padding_values
         self._drop_last = drop_last
 
-        self._source_disposed = False
-
         self._batch_helper = None
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        if self._source_disposed:
+        if self._source_iter is None:
             batch = []
         else:
             batch = [_SampleWrapper.next(self._source_iter) for _ in range(self._batch_size)]
 
-            self._source_disposed = batch[-1].is_disposed
+            source_disposed = batch[-1].is_disposed
+            if source_disposed:
+                self._source_iter = None
 
-            if self._source_disposed:
+            if source_disposed:
                 if self._drop_last:
                     batch.clear()
                 else:

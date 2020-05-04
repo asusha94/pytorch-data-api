@@ -15,8 +15,6 @@ class _WindowPaddedIterator:
 
         self._window = []
 
-        self._source_disposed = False
-
         self._batch_helper = None
 
     def __iter__(self):
@@ -24,7 +22,7 @@ class _WindowPaddedIterator:
 
     def __next__(self):
         try:
-            while not self._source_disposed and len(self._window) < self._size:
+            while self._source_iter is not None and len(self._window) < self._size:
                 while self._skip > 0:
                     self._skip -= 1
                     sample = _SampleWrapper.next(self._source_iter)
@@ -34,7 +32,7 @@ class _WindowPaddedIterator:
                     sample = _SampleWrapper.next(self._source_iter)
 
                 if sample.is_disposed:
-                    self._source_disposed = True
+                    self._source_iter = None
                     if self._drop_last:
                         self._window.clear()
                 else:

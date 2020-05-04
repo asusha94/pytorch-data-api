@@ -13,24 +13,28 @@ class _SerialIterator:
         return self
 
     def __next__(self):
-        sample = next(self._source_iter, self._none)
-
-        if sample is self._none:
+        if self._source_iter is None:
             raise StopIteration()
         else:
-            if not isinstance(sample, tuple):
-                sample = (sample,)
+            sample = next(self._source_iter, self._none)
 
-            try:
-                return self._map_func(*sample)
-            except Exception:
-                if not self._ignore_errors:
-                    raise
-                else:
-                    import traceback
-                    traceback.print_exc()
+            if sample is self._none:
+                self._source_iter = None
+                raise StopIteration()
+            else:
+                if not isinstance(sample, tuple):
+                    sample = (sample,)
 
-                    return None
+                try:
+                    return self._map_func(*sample)
+                except Exception:
+                    if not self._ignore_errors:
+                        raise
+                    else:
+                        import traceback
+                        traceback.print_exc()
+
+                        return None
 
 
 class _ParallelSession:
@@ -139,8 +143,6 @@ class _ParallelIterator:
 
         self._ignore_errors = ignore_errors
 
-        self._source_disposed = False
-
         self._queue = []
 
         self._ordered = ordered
@@ -160,10 +162,10 @@ class _ParallelIterator:
         if self._pool is None:
             raise StopIteration()
         else:
-            while not self._source_disposed and len(self._queue) < self._n_workers:
+            while self._source_iter is not None and len(self._queue) < self._n_workers:
                 sample = next(self._source_iter, self._none)
                 if sample is self._none:
-                    self._source_disposed = True
+                    self._source_iter = None
                 else:
                     if not isinstance(sample, tuple):
                         sample = (sample,)

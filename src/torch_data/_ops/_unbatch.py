@@ -31,10 +31,11 @@ class _UnBatchIterator:
         return self
 
     def __next__(self):
-        while True:
+        while self._source_iter is not None:
             if self._batch is None:
                 sample = next(self._source_iter, self._none)
                 if sample is self._none:
+                    self._source_iter = None
                     raise StopIteration()
                 else:
                     is_tuple = isinstance(sample, tuple)
@@ -49,6 +50,8 @@ class _UnBatchIterator:
                 self._batch = None
             else:
                 return sample[0] if self._squeeze else sample
+        else:
+            raise StopIteration()
 
 
 class UnBatchDataOperation:
