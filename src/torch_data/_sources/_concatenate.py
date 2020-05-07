@@ -1,3 +1,5 @@
+import copy
+
 
 class _ConcatenateIterator:
     _none = object()
@@ -15,7 +17,7 @@ class _ConcatenateIterator:
             if sample is self._none:
                 del self._dataset_iters[0]
             else:
-                return sample
+                return copy.deepcopy(sample)
         else:
             raise StopIteration()
 

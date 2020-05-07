@@ -1,3 +1,4 @@
+import copy
 
 
 class _InterleaveIterator:
@@ -24,7 +25,7 @@ class _InterleaveIterator:
                         del self._dataset_iters[self._idx]
                         self._idx -= 1
                 else:
-                    return sample
+                    return copy.deepcopy(sample)
             finally:  # cyclic
                 self._idx += 1
                 if self._idx >= len(self._dataset_iters):
