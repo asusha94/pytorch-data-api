@@ -31,8 +31,9 @@ class _SerialIterator:
                     if not self._ignore_errors:
                         raise
                     else:
+                        import sys
                         import traceback
-                        traceback.print_exc()
+                        traceback.print_exc(file=sys.stderr)
 
                         return None
 
@@ -123,8 +124,10 @@ class _ParallelIterator:
             result = map_func(*sample)
             return dill.dumps(result)
         except Exception:
+            import sys
             import traceback
-            print(multiprocessing.current_process().name, 'got an error:\n', traceback.format_exc())
+            print(multiprocessing.current_process().name, 'got an error:\n', traceback.format_exc(),
+                  file=sys.stderr, flush=True)
 
             if not ignore_errors:
                 raise

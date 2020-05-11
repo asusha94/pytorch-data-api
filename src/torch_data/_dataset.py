@@ -155,7 +155,7 @@ class Dataset:
         op = CollateDataOperation(source=self.__source, collate_func=collate_func, buffer_size=buffer_size)
         return Dataset(_source=op)
 
-    def filter(self, predicate, expand_args=True):
+    def filter(self, predicate, expand_args=False):
         assert callable(predicate), 'predicate: Must be callable'
 
         op = FilterDataOperation(source=self.__source, predicate=predicate, expand_args=expand_args)
