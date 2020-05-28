@@ -94,7 +94,7 @@ class Dataset:
         return Dataset(_source=source)
 
     @staticmethod
-    def concatenate(*dataset_args, datasets=None):
+    def concatenate(*dataset_args, datasets=None, auto_prefetch=True):
         if datasets is None:
             datasets = dataset_args
 
@@ -106,12 +106,14 @@ class Dataset:
         if len(datasets) == 1:
             return datasets[0]
         else:
+            if auto_prefetch:
+                datasets = map(lambda x: x.prefetch(1), datasets)
             dataset_sources = [dataset.__source for dataset in datasets]
             source = ConcatenateDataSource(dataset_sources=dataset_sources)
             return Dataset(_source=source)
 
     @staticmethod
-    def interleave(*dataset_args, datasets=None, drop_tails=False):
+    def interleave(*dataset_args, datasets=None, drop_tails=False, auto_prefetch=True):
         if datasets is None:
             datasets = dataset_args
 
@@ -124,6 +126,8 @@ class Dataset:
         if len(datasets) == 1:
             return datasets[0]
         else:
+            if auto_prefetch:
+                datasets = map(lambda x: x.prefetch(1), datasets)
             dataset_sources = [dataset.__source for dataset in datasets]
             source = InterleaveDataSource(dataset_sources=dataset_sources, drop_tails=drop_tails)
             return Dataset(_source=source)
