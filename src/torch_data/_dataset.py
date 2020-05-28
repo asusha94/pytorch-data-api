@@ -230,4 +230,9 @@ class Dataset:
         import uuid
 
         session_id = uuid.uuid4().hex
-        return _DatasetIterator(session_id, self.__source)
+
+        source = self.__source
+        if not isinstance(source, PrefetchDataOperation):
+            source = PrefetchDataOperation(source=source, buffer_size=1)
+
+        return _DatasetIterator(session_id, source)
