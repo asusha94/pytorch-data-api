@@ -107,7 +107,14 @@ class Dataset:
             return datasets[0]
         else:
             if auto_prefetch:
-                datasets = map(lambda x: x.prefetch(1), datasets)
+                def map_fn(ds):
+                    source = ds.__source
+                    if not isinstance(source, PrefetchDataOperation):
+                        source = PrefetchDataOperation(source=source, buffer_size=1)
+                    return Dataset(_source=source)
+
+                datasets = map(map_fn, datasets)
+
             dataset_sources = [dataset.__source for dataset in datasets]
             source = ConcatenateDataSource(dataset_sources=dataset_sources)
             return Dataset(_source=source)
@@ -127,7 +134,14 @@ class Dataset:
             return datasets[0]
         else:
             if auto_prefetch:
-                datasets = map(lambda x: x.prefetch(1), datasets)
+                def map_fn(ds):
+                    source = ds.__source
+                    if not isinstance(source, PrefetchDataOperation):
+                        source = PrefetchDataOperation(source=source, buffer_size=1)
+                    return Dataset(_source=source)
+
+                datasets = map(map_fn, datasets)
+
             dataset_sources = [dataset.__source for dataset in datasets]
             source = InterleaveDataSource(dataset_sources=dataset_sources, drop_tails=drop_tails)
             return Dataset(_source=source)
