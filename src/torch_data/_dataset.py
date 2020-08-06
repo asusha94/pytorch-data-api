@@ -94,7 +94,7 @@ class Dataset:
         return Dataset(_source=source)
 
     @staticmethod
-    def concatenate(*dataset_args, datasets=None, auto_prefetch=True):
+    def concatenate(*dataset_args, datasets=None, auto_prefetch=False):
         if datasets is None:
             datasets = dataset_args
 
@@ -120,7 +120,7 @@ class Dataset:
             return Dataset(_source=source)
 
     @staticmethod
-    def interleave(*dataset_args, datasets=None, drop_tails=False, auto_prefetch=True):
+    def interleave(*dataset_args, datasets=None, drop_tails=False, auto_prefetch=False):
         if datasets is None:
             datasets = dataset_args
 
