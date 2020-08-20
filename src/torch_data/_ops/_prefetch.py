@@ -95,11 +95,16 @@ class _PrefetchIterator:
 
         cancel_token = threading.Event()
         self._cancel_token = cancel_token
+
         pool = _ParallelSession.get(session_id)
         self._pool = pool
 
+        stopped_token = threading.Event()
+        self._stopped_token = stopped_token
+
         def submit_iteration(f=True):
             if not f:
+                stopped_token.set()
                 return
 
             pool.submit(_PrefetchIterator._prefetch_fn,
@@ -111,6 +116,7 @@ class _PrefetchIterator:
     def __del__(self):
         if self._pool is not None:
             self._cancel_token.set()
+            self._stopped_token.wait()
             _ParallelSession.release(self._pool)
             self._pool = None
 
