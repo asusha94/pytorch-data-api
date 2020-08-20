@@ -90,21 +90,21 @@ class _PrefetchIterator:
                 return True
 
     def __init__(self, session_id, source_iter, buffer_size):
-        self._buffer = queue.Queue(buffer_size)
-        self._cancel_token = threading.Event()
+        buffer = queue.Queue(buffer_size)
+        self._buffer = buffer
 
+        cancel_token = threading.Event()
+        self._cancel_token = cancel_token
         pool = _ParallelSession.get(session_id)
         self._pool = pool
-
-        self._fut = None
 
         def submit_iteration(f=True):
             if not f:
                 return
 
-            self._fut = pool.submit(_PrefetchIterator._prefetch_fn,
-                                    args=(self._buffer, source_iter, self._cancel_token),
-                                    callback=submit_iteration)
+            pool.submit(_PrefetchIterator._prefetch_fn,
+                        args=(buffer, source_iter, cancel_token),
+                        callback=submit_iteration)
 
         submit_iteration()
 

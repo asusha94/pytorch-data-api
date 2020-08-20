@@ -86,7 +86,8 @@ class TestDataset(unittest.TestCase):
 
         ds = torch_data.Dataset.interleave(
             torch_data.Dataset.from_tensor_slices([1, 2, 3, 4]),
-            torch_data.Dataset.from_tensor_slices(['1', '2', '3'])
+            torch_data.Dataset.from_tensor_slices(['1', '2', '3']),
+            auto_prefetch=True
         )
 
         out = []
