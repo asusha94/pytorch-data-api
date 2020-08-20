@@ -2,30 +2,116 @@ import threading
 import queue
 
 
+class _ParallelSession:
+    class Pool:
+        @property
+        def uid(self):
+            return self._uid
+
+        def __init__(self, uid):
+            import multiprocessing.dummy as mp
+
+            self._ctx = mp
+
+            self._uid = uid
+            self._counter = 0
+
+            self._pool = None
+
+        def submit(self, task, args=None, kwargs=None, callback=None):
+            assert self._pool is not None, 'The Pool has been disposed'
+
+            if args is None:
+                args = tuple()
+
+            if kwargs is None:
+                kwargs = dict()
+
+            return self._pool.apply_async(task, args=args, kwds=kwargs, callback=callback)
+
+        def _start(self):
+            if not self._pool:
+                import os
+                self._pool = self._ctx.Pool(os.cpu_count())
+
+        def _stop(self):
+            if self._pool:
+                self._pool.close()
+
+                self._pool = None
+
+        def _increment_ref(self):
+            self._counter += 1
+            if self._counter > 0:
+                self._start()
+
+        def _decrement_ref(self):
+            self._counter -= 1
+            assert self._counter >= 0
+
+            if self._counter == 0:
+                self._stop()
+
+            return self._counter == 0
+
+    _pools = dict()
+
+    @staticmethod
+    def get(uid):
+        pool = _ParallelSession._pools.get(uid)
+        if pool is None:
+            pool = _ParallelSession.Pool(uid)
+            _ParallelSession._pools[uid] = pool
+
+        pool._increment_ref()
+
+        return pool
+
+    @staticmethod
+    def release(pool):
+        if pool._decrement_ref():
+            del _ParallelSession._pools[pool.uid]
+
+
 class _PrefetchIterator:
     _none = object()
 
     @staticmethod
     def _prefetch_fn(output_queue, source_iter, cancel_token):
-        while not cancel_token.is_set():
+        if cancel_token.is_set():
+            return False
+        else:
             sample = next(source_iter, _PrefetchIterator._none)
             output_queue.put(sample)
-            if sample is _PrefetchIterator._none:
-                break
 
-    def __init__(self, source_iter, buffer_size):
+            if sample is _PrefetchIterator._none:
+                return False
+            else:
+                return True
+
+    def __init__(self, session_id, source_iter, buffer_size):
         self._buffer = queue.Queue(buffer_size)
         self._cancel_token = threading.Event()
 
-        self._thread = threading.Thread(target=_PrefetchIterator._prefetch_fn,
-                                        args=(self._buffer, source_iter, self._cancel_token))
-        self._thread.daemon = True
-        self._thread.start()
+        self._pool = _ParallelSession.get(session_id)
+
+        self._fut = None
+
+        def submit_iteration(f=True):
+            if not f or self._pool is None:
+                return
+
+            self._fut = self._pool.submit(_PrefetchIterator._prefetch_fn,
+                                          args=(self._buffer, source_iter, self._cancel_token),
+                                          callback=submit_iteration)
+
+        submit_iteration()
 
     def __del__(self):
-        if self._thread.is_alive():
+        if self._pool is not None:
             self._cancel_token.set()
-            self._thread.join(1e-1)
+            _ParallelSession.release(self._pool)
+            self._pool = None
 
     def __iter__(self):
         return self
@@ -35,6 +121,8 @@ class _PrefetchIterator:
             raise StopIteration
         else:
             sample = self._buffer.get()
+            self._buffer.task_done()
+
             if sample is self._none:
                 self._buffer = None
                 self._cancel_token.set()
@@ -49,4 +137,4 @@ class PrefetchDataOperation:
         self._buffer_size = buffer_size
 
     def get_iter(self, session_id):
-        return _PrefetchIterator(self._source.get_iter(session_id), self._buffer_size)
+        return _PrefetchIterator(session_id, self._source.get_iter(session_id), self._buffer_size)
