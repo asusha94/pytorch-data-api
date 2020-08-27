@@ -1,4 +1,7 @@
-
+import asyncio
+import aioitertools
+import os
+from contextlib import suppress
 from ._sources import GeneratorDataSource, TensorSlicesDataSource, TensorsDataSource
 from ._sources import ConcatenateDataSource, InterleaveDataSource
 
@@ -12,11 +15,11 @@ class _EmptyDatasetIterator:
     def __init__(self, session_id):
         self._session_id = session_id
 
-    def __iter__(self):
+    def __aiter__(self):
         return self
 
-    def __next__(self):
-        raise StopIteration()
+    async def __anext__(self):
+        raise StopAsyncIteration()
 
 
 class _EmptyDatasetSource:
@@ -24,22 +27,46 @@ class _EmptyDatasetSource:
         return _EmptyDatasetIterator(session_id)
 
 
-class _DatasetIterator:
-    _none = object()
-
+class _DatasetAsyncIterator:
     def __init__(self, session_id, source):
         self._session_id = session_id
         self._source_iter = source.get_iter(session_id)
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        return await aioitertools.next(self._source_iter)
+
+
+class _DatasetSyncIterator:
+    def __init__(self, async_iter):
+        self._async_iter = aioitertools.iter(async_iter)
+
+        self._loop = asyncio.get_event_loop()
+
+        from signal import SIGINT, SIGTERM
+
+        def raise_keyboard():
+            raise KeyboardInterrupt()
+
+        def raise_exit():
+            raise SystemExit()
+
+        self._loop.add_signal_handler(SIGINT, raise_keyboard)
+        self._loop.add_signal_handler(SIGTERM, raise_exit)
+
+    async def __next(self):
+        return await aioitertools.next(self._async_iter)
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        item = next(self._source_iter, self._none)
-        if item is self._none:
+        try:
+            return self._loop.run_until_complete(self.__next())
+        except StopAsyncIteration:
             raise StopIteration()
-        else:
-            return item
 
 
 class Dataset:
@@ -185,6 +212,9 @@ class Dataset:
         assert num_parallel_calls is None or isinstance(num_parallel_calls, int), \
             'num_parallel_calls: Must be None or integer'
 
+        if num_parallel_calls is None:
+            num_parallel_calls = os.cpu_count()
+
         op = MapDataOperation(source=self.__source, map_func=map_func,
                               num_parallel_calls=num_parallel_calls,
                               ordered=ordered, ignore_errors=ignore_errors)
@@ -240,7 +270,7 @@ class Dataset:
         else:
             self.__source = _source
 
-    def __iter__(self):
+    def __aiter__(self):
         import uuid
 
         session_id = uuid.uuid4().hex
@@ -249,4 +279,7 @@ class Dataset:
         if not isinstance(source, PrefetchDataOperation):
             source = PrefetchDataOperation(source=source, buffer_size=1)
 
-        return _DatasetIterator(session_id, source)
+        return _DatasetAsyncIterator(session_id, source)
+
+    def __iter__(self):
+        return _DatasetSyncIterator(self.__aiter__())

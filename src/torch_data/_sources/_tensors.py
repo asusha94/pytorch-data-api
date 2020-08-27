@@ -4,12 +4,12 @@ class _TensorsIterator:
         self._session_id = session_id
         self._tensors = tensors
 
-    def __iter__(self):
+    def __aiter__(self):
         return self
 
-    def __next__(self):
+    async def __anext__(self):
         if self._tensors is None:
-            raise StopIteration()
+            raise StopAsyncIteration()
         else:
             try:
                 return self._tensors

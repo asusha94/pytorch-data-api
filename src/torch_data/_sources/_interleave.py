@@ -1,8 +1,7 @@
+import aioitertools
 
 
 class _InterleaveIterator:
-    _none = object()
-
     def __init__(self, session_id, dataset_iters, drop_tails):
         self._session_id = session_id
         self._dataset_iters = dataset_iters
@@ -10,27 +9,25 @@ class _InterleaveIterator:
         self._drop_tails = drop_tails
         self._idx = 0
 
-    def __iter__(self):
+    def __aiter__(self):
         return self
 
-    def __next__(self):
-        while self._dataset_iters:
+    async def __anext__(self):
+        while len(self._dataset_iters):
             try:
-                sample = next(self._dataset_iters[self._idx], self._none)
-                if sample is self._none:
-                    if self._drop_tails:
-                        self._dataset_iters.clear()
-                    else:
-                        del self._dataset_iters[self._idx]
-                        self._idx -= 1
+                return await aioitertools.next(self._dataset_iters[self._idx])
+            except StopAsyncIteration:
+                if self._drop_tails:
+                    self._dataset_iters.clear()
                 else:
-                    return sample
+                    del self._dataset_iters[self._idx]
+                    self._idx -= 1
             finally:  # cyclic
                 self._idx += 1
                 if self._idx >= len(self._dataset_iters):
                     self._idx = 0
         else:
-            raise StopIteration()
+            raise StopAsyncIteration()
 
 
 class InterleaveDataSource:

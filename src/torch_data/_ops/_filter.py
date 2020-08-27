@@ -1,33 +1,42 @@
+import asyncio
+import aioitertools
 
-class _SerialIterator:
-    _none = object()
 
-    def __init__(self, source, predicate, expand_args):
-        self._source_iter = iter(source)
-        self._predicate = predicate
+class _Iterator:
+    def __init__(self, source_iter, predicate, expand_args):
+        self._source_iter = source_iter
+
+        if asyncio.iscoroutinefunction(predicate):
+            self._predicate = predicate
+        else:
+            async def _wrapper(*args):
+                return predicate(*args)
+
+            self._predicate = _wrapper
+
         self._expand_args = expand_args
 
-    def __iter__(self):
+    def __aiter__(self):
         return self
 
-    def __next__(self):
+    async def __anext__(self):
         while self._source_iter is not None:
-            sample = next(self._source_iter, self._none)
-
-            if sample is self._none:
-                self._source_iter = None
-            else:
+            try:
+                sample = await aioitertools.next(self._source_iter)
                 if not self._expand_args:
-                    val = self._predicate(sample)
+                    val = await self._predicate(sample)
                 else:
                     if not isinstance(sample, tuple):
                         sample = (sample,)
-                    val = self._predicate(*sample)
+                    val = await self._predicate(*sample)
 
                 if val:
                     return sample
+            except StopAsyncIteration:
+                self._source_iter = None
+                raise
         else:
-            raise StopIteration()
+            raise StopAsyncIteration()
 
 
 class FilterDataOperation:
@@ -37,4 +46,4 @@ class FilterDataOperation:
         self._expand_args = expand_args
 
     def get_iter(self, session_id):
-        return _SerialIterator(self._source.get_iter(session_id), self._predicate, self._expand_args)
+        return _Iterator(self._source.get_iter(session_id), self._predicate, self._expand_args)

@@ -1,3 +1,4 @@
+import aioitertools
 import copy
 
 
@@ -27,31 +28,32 @@ class _UnBatchIterator:
         self._batch = None
         self._squeeze = None
 
-    def __iter__(self):
+    def __aiter__(self):
         return self
 
-    def __next__(self):
+    async def __anext__(self):
         while self._source_iter is not None:
             if self._batch is None:
-                sample = next(self._source_iter, self._none)
-                if sample is self._none:
-                    self._source_iter = None
-                    raise StopIteration()
-                else:
+                try:
+                    sample = await aioitertools.next(self._source_iter)
+
                     is_tuple = isinstance(sample, tuple)
                     if not is_tuple:
                         sample = (sample,)
 
                     self._batch = _SampleIterator(sample)
                     self._squeeze = not is_tuple
+                except StopAsyncIteration:
+                    self._source_iter = None
+                    raise
 
-            sample = next(self._batch, self._none)
-            if sample is self._none:
-                self._batch = None
-            else:
+            try:
+                sample = next(self._batch)
                 return sample[0] if self._squeeze else sample
+            except StopIteration:
+                self._batch = None
         else:
-            raise StopIteration()
+            raise StopAsyncIteration()
 
 
 class UnBatchDataOperation:

@@ -1,3 +1,4 @@
 dill>=0.3.0
 numpy>=1.0.0
 torch>=1.0.0
+aioitertools>=0.7.0

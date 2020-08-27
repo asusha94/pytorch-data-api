@@ -1,9 +1,8 @@
+import aioitertools
 import random
 
 
 class _ShuffleIterator:
-    _none = object()
-
     def __init__(self, source_iter, buffer_size, rand):
         self._source_iter = source_iter
         self._buffer_size = buffer_size
@@ -11,24 +10,23 @@ class _ShuffleIterator:
 
         self._buffer = []
 
-    def __iter__(self):
+    def __aiter__(self):
         return self
 
-    def __next__(self):
+    async def __anext__(self):
         while self._source_iter is not None and len(self._buffer) < self._buffer_size:
-            sample = next(self._source_iter, self._none)
-            if sample is self._none:
-                self._source_iter = None
-            else:
+            try:
+                sample = await aioitertools.next(self._source_iter)
                 cur_len = len(self._buffer)
                 in_idx = self._rand.randint(0, cur_len)  # including
                 self._buffer.insert(in_idx, sample)
+            except StopAsyncIteration:
+                self._source_iter = None
 
         if not self._buffer:
-            raise StopIteration()
+            raise StopAsyncIteration()
         else:
-            s = self._buffer.pop(0)
-            return s
+            return self._buffer.pop(0)
 
 
 class ShuffleDataOperation:

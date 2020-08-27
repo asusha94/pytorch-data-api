@@ -1,25 +1,23 @@
+import aioitertools
 
 
 class _GeneratorIterator:
-    _none = object()
-
     def __init__(self, session_id, iterator):
         self._session_id = session_id
         self._iter = iterator
 
-    def __iter__(self):
+    def __aiter__(self):
         return self
 
-    def __next__(self):
+    async def __anext__(self):
         if self._iter is None:
-            raise StopIteration()
+            raise StopAsyncIteration()
 
-        sample = next(self._iter, self._none)
-        if sample is self._none:
+        try:
+            return await aioitertools.next(self._iter)
+        except StopAsyncIteration:
             self._iter = None
-            raise StopIteration()
-        else:
-            return sample
+            raise
 
 
 class GeneratorDataSource:
@@ -27,7 +25,8 @@ class GeneratorDataSource:
         if args is None:
             args = tuple()
 
-        self.__get_iterator = lambda sid: _GeneratorIterator(sid, iter(generator(*args)))
+        self._generator = generator
+        self._args = args
 
     def get_iter(self, session_id):
-        return self.__get_iterator(session_id)
+        return _GeneratorIterator(session_id, aioitertools.iter(self._generator(*self._args)))

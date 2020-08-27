@@ -1,3 +1,4 @@
+import aioitertools
 import copy
 
 _STRATEGIES = []
@@ -115,23 +116,15 @@ class _BatchIterator:
         self._batch_helper = None
         self._squeeze = None
 
-    def __iter__(self):
+    def __aiter__(self):
         return self
 
-    def __next__(self):
+    async def __anext__(self):
         try:
             while self._batch_counter < self._batch_size:
-                sample = next(self._source_iter, self._none)
-                if sample is self._none:
-                    if self._drop_last:
-                        self._batch = None
-                    elif self._batch is not None:
-                        sample = tuple([None] * len(self._batch))
-                        for i in range(self._batch_counter, self._batch_size):
-                            self._batch_helper.batch_insert(self._batch, i, sample)
+                try:
+                    sample = await aioitertools.next(self._source_iter)
 
-                    self._batch_counter = self._batch_size
-                else:
                     is_tuple = isinstance(sample, tuple)
                     if not is_tuple:
                         sample = (sample,)
@@ -148,9 +141,18 @@ class _BatchIterator:
                     self._batch_helper.batch_insert(self._batch, self._batch_counter, sample)
 
                     self._batch_counter += 1
+                except StopAsyncIteration:
+                    if self._drop_last:
+                        self._batch = None
+                    elif self._batch is not None:
+                        sample = tuple([None] * len(self._batch))
+                        for i in range(self._batch_counter, self._batch_size):
+                            self._batch_helper.batch_insert(self._batch, i, sample)
+
+                    self._batch_counter = self._batch_size
 
             if self._batch is None:
-                raise StopIteration()
+                raise StopAsyncIteration()
             else:
                 return self._batch[0] if self._squeeze else self._batch
         finally:

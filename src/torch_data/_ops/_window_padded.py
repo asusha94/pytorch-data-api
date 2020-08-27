@@ -17,19 +17,19 @@ class _WindowPaddedIterator:
 
         self._batch_helper = None
 
-    def __iter__(self):
+    def __aiter__(self):
         return self
 
-    def __next__(self):
+    async def __anext__(self):
         try:
             while self._source_iter is not None and len(self._window) < self._size:
                 while self._skip > 0:
                     self._skip -= 1
-                    sample = _SampleWrapper.next(self._source_iter)
+                    sample = await _SampleWrapper.next(self._source_iter)
                     if sample.is_disposed:
                         break
                 else:
-                    sample = _SampleWrapper.next(self._source_iter)
+                    sample = await _SampleWrapper.next(self._source_iter)
 
                 if sample.is_disposed:
                     self._source_iter = None
@@ -39,7 +39,7 @@ class _WindowPaddedIterator:
                     self._window.append(sample)
 
             if not len(self._window):
-                raise StopIteration()
+                raise StopAsyncIteration()
             else:
                 if self._batch_helper is None:
                     self._batch_helper = _BatchPaddedHelper(

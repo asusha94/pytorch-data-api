@@ -1,3 +1,4 @@
+import aioitertools
 import copy
 import operator
 
@@ -333,8 +334,13 @@ class _SampleWrapper:
         return self._is_tuple
 
     @staticmethod
-    def next(iter):
-        return _SampleWrapper(next(iter, _SampleWrapper._none))
+    async def next(iter):
+        try:
+            sample = await aioitertools.next(iter)
+        except StopAsyncIteration:
+            sample = _SampleWrapper._none
+
+        return _SampleWrapper(sample)
 
 
 class _BatchPaddedIterator:
@@ -347,14 +353,14 @@ class _BatchPaddedIterator:
 
         self._batch_helper = None
 
-    def __iter__(self):
+    def __aiter__(self):
         return self
 
-    def __next__(self):
+    async def __anext__(self):
         if self._source_iter is None:
-            batch = []
+            batch = None
         else:
-            batch = [_SampleWrapper.next(self._source_iter) for _ in range(self._batch_size)]
+            batch = [await _SampleWrapper.next(self._source_iter) for _ in range(self._batch_size)]
 
             source_disposed = batch[-1].is_disposed
             if source_disposed:
@@ -373,7 +379,7 @@ class _BatchPaddedIterator:
                     batch = batch[:idx + 1]
 
         if not batch:
-            raise StopIteration()
+            raise StopAsyncIteration()
         else:
             if self._batch_helper is None:
                 self._batch_helper = _BatchPaddedHelper(
