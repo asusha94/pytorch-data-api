@@ -195,8 +195,10 @@ class _PrefetchIterator:
             if sample is self._none:
                 self._buffer = None
 
-                self._cancel_token.set()
-                await self._task
+                if self._cancel_token is not None:
+                    self._cancel_token.set()
+                    self._cancel_token = None
+                    await self._task
                 raise StopAsyncIteration
             else:
                 return sample

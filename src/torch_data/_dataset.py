@@ -1,7 +1,7 @@
 import asyncio
 import aioitertools
 import os
-from contextlib import suppress
+
 from ._sources import GeneratorDataSource, TensorSlicesDataSource, TensorsDataSource
 from ._sources import ConcatenateDataSource, InterleaveDataSource
 
@@ -41,11 +41,11 @@ class _DatasetAsyncIterator:
 
 class _DatasetSyncIterator:
     def __init__(self, async_iter):
+        from signal import SIGINT, SIGTERM
+
         self._async_iter = aioitertools.iter(async_iter)
 
         self._loop = asyncio.get_event_loop()
-
-        from signal import SIGINT, SIGTERM
 
         def raise_keyboard():
             raise KeyboardInterrupt()
@@ -213,6 +213,8 @@ class Dataset:
             'num_parallel_calls: Must be None or integer'
 
         if num_parallel_calls is None:
+            num_parallel_calls = 0
+        elif num_parallel_calls < 0:
             num_parallel_calls = os.cpu_count()
 
         op = MapDataOperation(source=self.__source, map_func=map_func,
