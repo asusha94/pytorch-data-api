@@ -20,33 +20,43 @@ class _SerialIterator:
             self._map_func = _wrapper
 
         self._ignore_errors = ignore_errors
+        self._result_ds = None
 
     def __aiter__(self):
         return self
 
     async def __anext__(self):
-        if self._source_iter is None:
-            raise StopAsyncIteration()
-        else:
-            try:
-                sample = await aioitertools.next(self._source_iter)
-                if not isinstance(sample, tuple):
-                    sample = (sample,)
+        from .. import _dataset
 
+        while self._source_iter is not None or self._result_ds is not None:
+            if self._result_ds is not None:
                 try:
-                    return await self._map_func(*sample)
-                except Exception:
-                    if not self._ignore_errors:
-                        raise
-                    else:
-                        import sys
-                        import traceback
-                        traceback.print_exc(file=sys.stderr)
+                    return await aioitertools.next(self._result_ds)
+                except StopAsyncIteration:
+                    self._result_ds = None
+            else:
+                try:
+                    sample = await aioitertools.next(self._source_iter)
+                    if not isinstance(sample, tuple):
+                        sample = (sample,)
 
-                        return None
-            except StopAsyncIteration:
-                self._source_iter = None
-                raise
+                    try:
+                        result = await self._map_func(*sample)
+                        if isinstance(result, _dataset.Dataset):
+                            self._result_ds = aioitertools.iter(result)
+                        else:
+                            return result
+                    except Exception:
+                        if not self._ignore_errors:
+                            raise
+                        else:
+                            import sys
+                            import traceback
+                            traceback.print_exc(file=sys.stderr)
+                except StopAsyncIteration:
+                    self._source_iter = None
+        else:
+            raise StopAsyncIteration()
 
 
 _MP_CTX = mp.get_context('spawn')
@@ -236,6 +246,7 @@ class _ParallelIterator:
     @staticmethod
     async def _parallel_process(map_func, input_queue, output_queue, cancel_token):
         import multiprocessing
+        from .. import _dataset
 
         _map_func = dill.loads(map_func)
 
@@ -247,6 +258,12 @@ class _ParallelIterator:
 
             map_func = _wrapper
 
+        async def send_result(idx, next_flag, result):
+            while output_queue.full():
+                await asyncio.sleep(0)
+            else:
+                output_queue.put(dill.dumps((idx, next_flag, result)))
+
         while not cancel_token.is_set():
             if input_queue.empty():
                 await asyncio.sleep(0)
@@ -255,7 +272,8 @@ class _ParallelIterator:
                     idx, sample = dill.loads(input_queue.get())
 
                     try:
-                        result = (True, await map_func(*sample))
+                        result = await map_func(*sample)
+                        result = (True, result)
                     except Exception:
                         import sys
                         import traceback
@@ -265,10 +283,12 @@ class _ParallelIterator:
 
                         result = (False, RuntimeError(f'Sample #{idx}:\n' + traceback.format_exc()))
 
-                    while output_queue.full():
-                        await asyncio.sleep(0)
+                    if isinstance(result[1], _dataset.Dataset):
+                        async for item in result[1]:
+                            await send_result(idx, False, (True, item))
+                        await send_result(idx, True, (False, None))
                     else:
-                        output_queue.put(dill.dumps((idx, result)))
+                        await send_result(idx, True, result)
                 finally:
                     pass
 
@@ -338,17 +358,19 @@ class _ParallelIterator:
 
             remove_list = []
             try:
-                for i, (idx, (flag, result)) in enumerate(self._result_bag):
+                for i, (idx, next_flag, item) in enumerate(self._result_bag):
                     if self._put_strategy(self._fetch_next_idx, idx):
                         try:
+                            (flag, result) = item
                             if flag:
                                 return result
                             else:
                                 if not self._ignore_errors and isinstance(result, Exception):
                                     raise result
                         finally:
-                            self._fetch_next_idx += 1
-                            self._samples_in_process -= 1
+                            if next_flag:
+                                self._fetch_next_idx += 1
+                                self._samples_in_process -= 1
                             remove_list.append(i)
             finally:
                 for i in reversed(remove_list):

@@ -106,6 +106,15 @@ class TestDataset(unittest.TestCase):
 
         self.assertEqual(i, 99)
 
+    def test_serial_map_ds(self):
+        ds = torch_data.Dataset.from_generator(range, args=(100,))
+        ds = ds.map(lambda x: torch_data.Dataset.from_tensor_slices([x**2]))
+
+        for i, r in enumerate(ds):
+            self.assertEqual(i**2, r)
+
+        self.assertEqual(i, 99)
+
     def test_parallel_map_ordered(self):
         ds = torch_data.Dataset.from_generator(range, args=(100,))
         ds = ds.map(lambda x: x**2, num_parallel_calls=3)
@@ -115,9 +124,31 @@ class TestDataset(unittest.TestCase):
 
         self.assertEqual(i, 99)
 
+    def test_parallel_map_ordered_ds(self):
+        ds = torch_data.Dataset.from_generator(range, args=(100,))
+        ds = ds.map(lambda x: torch_data.Dataset.from_tensor_slices([x**2]), num_parallel_calls=3)
+
+        for i, r in enumerate(ds):
+            self.assertEqual(i**2, r)
+
+        self.assertEqual(i, 99)
+
     def test_parallel_map_unordered(self):
         ds = torch_data.Dataset.from_generator(range, args=(100,))
         ds = ds.map(lambda x: x**2, num_parallel_calls=3, ordered=False)
+
+        sum_1 = 0
+        sum_2 = 0
+        for i, r in enumerate(ds):
+            sum_1 += i**2
+            sum_2 += r
+
+        self.assertEqual(i, 99)
+        self.assertEqual(sum_1, sum_2)
+
+    def test_parallel_map_ds_unordered(self):
+        ds = torch_data.Dataset.from_generator(range, args=(100,))
+        ds = ds.map(lambda x: torch_data.Dataset.from_tensor_slices([x**2]), num_parallel_calls=3, ordered=False)
 
         sum_1 = 0
         sum_2 = 0
