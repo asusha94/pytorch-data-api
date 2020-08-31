@@ -83,12 +83,12 @@ class AsyncProcess:
                             task = dill.loads(self._queue.get())
                             fut = loop.create_task(_wrapper(task.coro, *task.args, **task.kwargs))
                             fut.add_done_callback(lambda f: self._queue.task_done())
+                        except (EOFError, mp.managers.RemoteError):
+                            self._cancel_token.set()
                         except Exception:
                             import traceback
                             print(mp.current_process().name, 'got an error:\n', traceback.format_exc(),
                                   file=sys.stderr, flush=True)
-                        except EOFError:
-                            self._cancel_token.set()
 
             def raise_keyboard():
                 raise KeyboardInterrupt()

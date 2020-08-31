@@ -47,6 +47,9 @@ class _DatasetSyncIterator:
 
         loop = asyncio.get_event_loop()
         if loop.is_running():
+            import nest_asyncio
+            nest_asyncio.apply(loop)
+
             old_loop = loop
             loop = asyncio.new_event_loop()
         else:
