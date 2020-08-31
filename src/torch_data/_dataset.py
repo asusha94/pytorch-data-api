@@ -244,7 +244,7 @@ class Dataset:
 
         return Dataset(_source=op)
 
-    def map(self, map_func, num_parallel_calls=None, ordered=True, ignore_errors=False):
+    def map(self, map_func, num_parallel_calls=None, ordered=False, ignore_errors=False):
         from ._ops import MapDataOperation
 
         assert callable(map_func), 'map_func: Must be callable'

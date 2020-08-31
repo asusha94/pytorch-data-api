@@ -364,7 +364,7 @@ class _ParallelIterator:
             remove_list = []
             try:
                 for i, (idx, next_flag, item) in enumerate(self._result_bag):
-                    if self._put_strategy(self._fetch_next_idx, idx):
+                    if self._put_strategy(self._fetch_next_idx, idx) or not next_flag:
                         try:
                             (flag, result) = item
                             if flag:
