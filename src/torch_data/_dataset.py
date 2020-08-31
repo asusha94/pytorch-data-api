@@ -45,7 +45,12 @@ class _DatasetSyncIterator:
 
         self._async_iter = aioitertools.iter(async_iter)
 
-        self._loop = asyncio.get_event_loop()
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            old_loop = loop
+            loop = asyncio.new_event_loop()
+        else:
+            old_loop = None
 
         def raise_keyboard():
             raise KeyboardInterrupt()
@@ -53,18 +58,35 @@ class _DatasetSyncIterator:
         def raise_exit():
             raise SystemExit()
 
-        self._loop.add_signal_handler(SIGINT, raise_keyboard)
-        self._loop.add_signal_handler(SIGTERM, raise_exit)
+        loop.add_signal_handler(SIGINT, raise_keyboard)
+        loop.add_signal_handler(SIGTERM, raise_exit)
+
+        self._old_loop = old_loop
+        self._loop = loop
 
     async def __next(self):
         return await aioitertools.next(self._async_iter)
+
+    def __del__(self):
+        if self._old_loop is not None:
+            self._loop.close()
 
     def __iter__(self):
         return self
 
     def __next__(self):
         try:
-            return self._loop.run_until_complete(self.__next())
+            task = self.__next()
+            if self._old_loop is None:
+                result = self._loop.run_until_complete(task)
+            else:
+                try:
+                    asyncio.set_event_loop(self._loop)
+                    result = self._loop.run_until_complete(task)
+                finally:
+                    asyncio.set_event_loop(self._old_loop)
+
+            return result
         except StopAsyncIteration:
             raise StopIteration()
 
