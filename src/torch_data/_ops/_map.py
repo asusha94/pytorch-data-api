@@ -245,6 +245,7 @@ class ProcessPool(metaclass=MetaSingleton):
 class _ParallelIterator:
     @staticmethod
     async def _parallel_process(map_func, input_queue, output_queue, cancel_token):
+        import gc
         import multiprocessing
         from .. import _dataset
 
@@ -284,9 +285,13 @@ class _ParallelIterator:
                         result = (False, RuntimeError(f'Sample #{idx}:\n' + traceback.format_exc()))
 
                     if isinstance(result[1], _dataset.Dataset):
-                        async for item in result[1]:
-                            await send_result(idx, False, (True, item))
-                        await send_result(idx, True, (False, None))
+                        try:
+                            async for item in result[1]:
+                                await send_result(idx, False, (True, item))
+                            await send_result(idx, True, (False, None))
+                        finally:
+                            result = None
+                            gc.collect()
                     else:
                         await send_result(idx, True, result)
                 finally:
@@ -305,8 +310,8 @@ class _ParallelIterator:
 
         # self._input_queue_n_tasks = _ParallelSession.manager.Semaphore(0)
 
-        self._input_queue = self._pool.manager.Queue()
-        self._output_queue = self._pool.manager.Queue()
+        self._input_queue = self._pool.manager.Queue(self._n_workers)
+        self._output_queue = self._pool.manager.Queue(2 * self._n_workers)
         self._cancel_token = self._pool.manager.Event()
 
         self._fetch_next_idx = 0
