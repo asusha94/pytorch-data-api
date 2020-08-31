@@ -259,11 +259,23 @@ class _ParallelIterator:
 
             map_func = _wrapper
 
-        async def send_result(idx, next_flag, result):
+        async def send_result(idx, result):
             while output_queue.full():
                 await asyncio.sleep(0)
             else:
-                output_queue.put(dill.dumps((idx, next_flag, result)))
+                output_queue.put(dill.dumps((idx, True, result)))
+
+        async def send_results(idx, results):
+            results = [
+                (idx, False, result)
+                for result in results
+            ]
+            results.append((idx, True, (False, None)))
+
+            while output_queue.full():
+                await asyncio.sleep(0)
+            else:
+                output_queue.put(dill.dumps(results))
 
         while not cancel_token.is_set():
             if input_queue.empty():
@@ -286,14 +298,16 @@ class _ParallelIterator:
 
                     if isinstance(result[1], _dataset.Dataset):
                         try:
+                            results = []
                             async for item in result[1]:
-                                await send_result(idx, False, (True, item))
-                            await send_result(idx, True, (False, None))
+                                results.append((True, item))
+
+                            await send_results(idx, results)
                         finally:
                             result = None
                             gc.collect()
                     else:
-                        await send_result(idx, True, result)
+                        await send_result(idx, result)
                 finally:
                     pass
 
@@ -359,12 +373,16 @@ class _ParallelIterator:
                     self._source_iter = None
 
             while not self._output_queue.empty():
-                self._result_bag.append(dill.loads(self._output_queue.get()))
+                result = dill.loads(self._output_queue.get())
+                if isinstance(result, list):
+                    self._result_bag = self._result_bag + result
+                else:
+                    self._result_bag.append(result)
 
             remove_list = []
             try:
                 for i, (idx, next_flag, item) in enumerate(self._result_bag):
-                    if self._put_strategy(self._fetch_next_idx, idx) or not next_flag:
+                    if self._put_strategy(self._fetch_next_idx, idx):
                         try:
                             (flag, result) = item
                             if flag:

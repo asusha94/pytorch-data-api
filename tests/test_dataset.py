@@ -117,7 +117,7 @@ class TestDataset(unittest.TestCase):
 
     def test_parallel_map_ordered(self):
         ds = torch_data.Dataset.from_generator(range, args=(100,))
-        ds = ds.map(lambda x: x**2, num_parallel_calls=3)
+        ds = ds.map(lambda x: x**2, num_parallel_calls=3, ordered=True)
 
         for i, r in enumerate(ds):
             self.assertEqual(i**2, r)
@@ -126,7 +126,7 @@ class TestDataset(unittest.TestCase):
 
     def test_parallel_map_ordered_ds(self):
         ds = torch_data.Dataset.from_generator(range, args=(100,))
-        ds = ds.map(lambda x: torch_data.Dataset.from_tensor_slices([x**2]), num_parallel_calls=3)
+        ds = ds.map(lambda x: torch_data.Dataset.from_tensor_slices([x**2]), num_parallel_calls=3, ordered=True)
 
         for i, r in enumerate(ds):
             self.assertEqual(i**2, r)
